@@ -22,6 +22,7 @@ import {
   Trash2,
   Calendar,
   Layers,
+  User,
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -32,6 +33,9 @@ export default function DashboardPage() {
   const [isTrusted, setIsTrusted] = useState(true);
   const [ticket, setTicket] = useState('');
   const [profile, setProfile] = useState<any>(null);
+  const [personalEmailInput, setPersonalEmailInput] = useState('');
+  const [userRole, setUserRole] = useState<'rider' | 'driver'>('rider');
+  const [isSavingPersonalEmail, setIsSavingPersonalEmail] = useState(false);
   const [homes, setHomes] = useState<any[]>([]);
   const [applications, setApplications] = useState<any[]>([]);
   const [eduCodeInput, setEduCodeInput] = useState('');
@@ -92,6 +96,8 @@ export default function DashboardPage() {
         ]);
 
         setProfile(userProfile);
+        if (userProfile?.personalEmail) setPersonalEmailInput(userProfile.personalEmail);
+        if (userProfile?.userRoles?.includes('driver')) setUserRole('driver');
         setHomes(userHomes || []);
         if (userHomes?.length > 0) setAppHomeId(userHomes[0]._id);
         setApplications(userApps || []);
@@ -104,6 +110,37 @@ export default function DashboardPage() {
 
     init();
   }, [getToken, router]);
+
+  const handleSavePersonalEmail = async () => {
+    if (!personalEmailInput.trim()) return;
+    try {
+      setIsSavingPersonalEmail(true);
+      const api = createSchoolAPI(schoolUrl, ticket);
+      const updated = await api.updateProfile({
+        personalEmail: personalEmailInput.trim(),
+        userRoles: userRole === 'driver' ? ['driver', 'rider'] : ['rider'],
+      });
+      setProfile(updated);
+      alert('Personal email updated successfully!');
+    } catch (err: any) {
+      alert(err.message || 'Failed to update personal email');
+    } finally {
+      setIsSavingPersonalEmail(false);
+    }
+  };
+
+  const handleRoleChange = async (newRole: 'rider' | 'driver') => {
+    setUserRole(newRole);
+    try {
+      const api = createSchoolAPI(schoolUrl, ticket);
+      const updated = await api.updateProfile({
+        userRoles: newRole === 'driver' ? ['driver', 'rider'] : ['rider'],
+      });
+      setProfile(updated);
+    } catch (err) {
+      console.error('Failed to update role:', err);
+    }
+  };
 
   const handleSendEduCode = async () => {
     if (!eduEmailInput.trim()) return;
@@ -225,6 +262,97 @@ export default function DashboardPage() {
                   <Button size="sm" onClick={handleVerifyEduCode}>
                     Verify OTP
                   </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Profile & Role Configuration: Rider vs Driver Policies */}
+        {profile && (
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <User className="h-5 w-5 text-primary" /> Student Role & Verification Requirements
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Riders require only a school email. Drivers require both an institutional school email and a personal email.
+                </p>
+              </div>
+              <div className="flex bg-slate-100 p-0.5 rounded-lg border text-xs">
+                <button
+                  onClick={() => handleRoleChange('rider')}
+                  className={`px-3 py-1 rounded-md font-medium transition ${
+                    userRole === 'rider' ? 'bg-white shadow text-primary' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Rider
+                </button>
+                <button
+                  onClick={() => handleRoleChange('driver')}
+                  className={`px-3 py-1 rounded-md font-medium transition ${
+                    userRole === 'driver' ? 'bg-white shadow text-primary' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Driver
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 text-xs">
+              {/* Verification Status Pills */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <div className="flex items-center gap-1.5 p-2 rounded border bg-slate-50">
+                  <ShieldCheck className={`h-4 w-4 ${profile.isEduVerified ? 'text-emerald-600' : 'text-slate-400'}`} />
+                  <div>
+                    <span className="font-semibold text-slate-700">Institutional School Email: </span>
+                    <span className="text-slate-600">{profile.eduEmail || 'Not verified'}</span>
+                  </div>
+                  {profile.isEduVerified ? (
+                    <Badge className="bg-emerald-600 text-[10px] ml-1">Verified</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-amber-600 border-amber-300 text-[10px] ml-1">Unverified</Badge>
+                  )}
+                </div>
+
+                {userRole === 'driver' && (
+                  <div className="flex items-center gap-1.5 p-2 rounded border bg-slate-50">
+                    <Mail className={`h-4 w-4 ${profile.personalEmail ? 'text-emerald-600' : 'text-amber-500'}`} />
+                    <div>
+                      <span className="font-semibold text-slate-700">Driver Personal Email: </span>
+                      <span className="text-slate-600">{profile.personalEmail || 'Not configured'}</span>
+                    </div>
+                    {profile.personalEmail ? (
+                      <Badge className="bg-emerald-600 text-[10px] ml-1">Configured</Badge>
+                    ) : (
+                      <Badge variant="destructive" className="text-[10px] ml-1">Required</Badge>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Driver Personal Email Setup Input */}
+              {userRole === 'driver' && (
+                <div className="pt-2 border-t space-y-2">
+                  <label className="font-medium text-slate-700 block">
+                    Driver Personal Contact Email (Required for driver corridor matching & notifications)
+                  </label>
+                  <div className="flex gap-2 max-w-md">
+                    <Input
+                      type="email"
+                      placeholder="e.g. personal.name@gmail.com"
+                      value={personalEmailInput}
+                      onChange={(e) => setPersonalEmailInput(e.target.value)}
+                      className="text-xs bg-white"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleSavePersonalEmail}
+                      disabled={isSavingPersonalEmail}
+                    >
+                      {isSavingPersonalEmail ? 'Saving...' : 'Save Personal Email'}
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>

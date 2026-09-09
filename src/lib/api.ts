@@ -85,6 +85,19 @@ export const createSchoolAPI = (schoolBaseUrl: string, federationTicket: string)
       return res.json();
     },
 
+    async updateProfile(data: {
+      personalEmail?: string;
+      userRoles?: string[];
+      vehicle?: any;
+    }) {
+      const res = await fetch(`${schoolBaseUrl}/api/v1/auth/profile`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
     async listHomes() {
       const res = await fetch(`${schoolBaseUrl}/api/v1/homes`, { headers });
       return res.json();
