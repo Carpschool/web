@@ -95,9 +95,16 @@ export default function DashboardPage() {
           schoolApi.listMyApplications(),
         ]);
 
+        // Redirect to onboarding if student has not completed onboarding flow
+        if (userProfile && (!userProfile.isOnboarded || !userProfile.role)) {
+          router.push('/onboarding');
+          return;
+        }
+
         setProfile(userProfile);
         if (userProfile?.personalEmail) setPersonalEmailInput(userProfile.personalEmail);
-        if (userProfile?.userRoles?.includes('driver')) setUserRole('driver');
+        const activeRole = userProfile?.role || (userProfile?.userRoles?.includes('driver') ? 'driver' : 'rider');
+        setUserRole(activeRole);
         setHomes(userHomes || []);
         if (userHomes?.length > 0) setAppHomeId(userHomes[0]._id);
         setApplications(userApps || []);
@@ -129,18 +136,6 @@ export default function DashboardPage() {
     }
   };
 
-  const handleRoleChange = async (newRole: 'rider' | 'driver') => {
-    setUserRole(newRole);
-    try {
-      const api = createSchoolAPI(schoolUrl, ticket);
-      const updated = await api.updateProfile({
-        userRoles: newRole === 'driver' ? ['driver', 'rider'] : ['rider'],
-      });
-      setProfile(updated);
-    } catch (err) {
-      console.error('Failed to update role:', err);
-    }
-  };
 
   const handleSendEduCode = async () => {
     if (!eduEmailInput.trim()) return;
@@ -274,30 +269,19 @@ export default function DashboardPage() {
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <User className="h-5 w-5 text-primary" /> Student Role & Verification Requirements
+                  <User className="h-5 w-5 text-primary" /> Student Role & Verification Status
                 </CardTitle>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Riders require only a school email. Drivers require both an institutional school email and a personal email.
+                  Your account is dedicated to a single campus role to prevent corridor scheduling conflicts.
                 </p>
               </div>
-              <div className="flex bg-slate-100 p-0.5 rounded-lg border text-xs">
-                <button
-                  onClick={() => handleRoleChange('rider')}
-                  className={`px-3 py-1 rounded-md font-medium transition ${
-                    userRole === 'rider' ? 'bg-white shadow text-primary' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Rider
-                </button>
-                <button
-                  onClick={() => handleRoleChange('driver')}
-                  className={`px-3 py-1 rounded-md font-medium transition ${
-                    userRole === 'driver' ? 'bg-white shadow text-primary' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Driver
-                </button>
-              </div>
+              <Badge
+                variant={userRole === 'driver' ? 'default' : 'secondary'}
+                className="text-xs px-3 py-1 gap-1.5 font-semibold"
+              >
+                {userRole === 'driver' ? <Car className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+                {userRole === 'driver' ? 'Student Driver Account' : 'Student Rider Account'}
+              </Badge>
             </CardHeader>
             <CardContent className="space-y-4 text-xs">
               {/* Verification Status Pills */}
@@ -327,6 +311,21 @@ export default function DashboardPage() {
                     ) : (
                       <Badge variant="destructive" className="text-[10px] ml-1">Required</Badge>
                     )}
+                  </div>
+                )}
+
+                {userRole === 'driver' && profile.vehicle && (
+                  <div className="flex items-center gap-1.5 p-2 rounded border bg-slate-50">
+                    <Car className="h-4 w-4 text-primary" />
+                    <div>
+                      <span className="font-semibold text-slate-700">Vehicle: </span>
+                      <span className="text-slate-600">
+                        {profile.vehicle.color} {profile.vehicle.make} {profile.vehicle.model} ({profile.vehicle.licensePlate})
+                      </span>
+                    </div>
+                    <Badge variant="secondary" className="text-[10px] ml-1">
+                      {profile.vehicle.totalSeatCapacity} Seats
+                    </Badge>
                   </div>
                 )}
               </div>
@@ -375,40 +374,75 @@ export default function DashboardPage() {
             </Card>
           </Link>
 
-          <Link href="/corridor">
-            <Card className="hover:border-primary transition cursor-pointer h-full">
+          {userRole === 'driver' ? (
+            <Link href="/corridor">
+              <Card className="hover:border-primary transition cursor-pointer h-full border-primary/40 bg-primary/5">
+                <CardHeader className="pb-2">
+                  <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-1">
+                    <Compass className="h-5 w-5" />
+                  </div>
+                  <CardTitle className="text-base">Driver Commute Corridor</CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs text-slate-500">
+                  Search for prospective student riders along your route corridor and initiate in-chat negotiations.
+                </CardContent>
+              </Card>
+            </Link>
+          ) : (
+            <Card className="h-full bg-slate-50/60 border-dashed">
               <CardHeader className="pb-2">
-                <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-1">
+                <div className="h-10 w-10 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center mb-1">
                   <Compass className="h-5 w-5" />
                 </div>
-                <CardTitle className="text-base">Driver Matching Corridor</CardTitle>
+                <CardTitle className="text-base text-slate-400">Driver Commute Corridor</CardTitle>
               </CardHeader>
-              <CardContent className="text-xs text-slate-500">
-                Search for prospective student riders along your route corridor and initiate in-chat negotiations.
+              <CardContent className="text-xs text-slate-400">
+                Corridor driving and seat matching is exclusive to registered Driver accounts.
               </CardContent>
             </Card>
-          </Link>
+          )}
         </div>
 
-        {/* Rider Applications Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Car className="h-5 w-5 text-primary" /> Your Commute Applications
-              </h2>
-              <p className="text-xs text-slate-500">
-                Post commute requests so drivers travelling along your corridor can contact you.
-              </p>
+        {/* Role-Specific Actions: Driver Console vs Rider Applications */}
+        {userRole === 'driver' ? (
+          <Card className="border-primary/20 bg-gradient-to-r from-primary/5 via-blue-50/20 to-transparent shadow-sm">
+            <CardContent className="p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Badge variant="default" className="text-[10px]">Driver Console</Badge>
+                  <h3 className="font-bold text-base text-slate-900">Commute Corridor & Seat Matching</h3>
+                </div>
+                <p className="text-xs text-slate-600 max-w-lg">
+                  As a registered Driver, you pick up prospective student riders living along your commute corridor.
+                  Open the corridor matching map to view prospective riders and start negotiations.
+                </p>
+              </div>
+              <Link href="/corridor">
+                <Button className="text-xs gap-1.5 whitespace-nowrap">
+                  <Compass className="h-4 w-4" /> Open Driver Corridor
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Car className="h-5 w-5 text-primary" /> Your Commute Applications
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Post commute requests so drivers travelling along your corridor can contact you.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                className="text-xs gap-1"
+                onClick={() => setIsCreatingApp(!isCreatingApp)}
+              >
+                <Plus className="h-4 w-4" /> {isCreatingApp ? 'Close' : 'New Commute Request'}
+              </Button>
             </div>
-            <Button
-              size="sm"
-              className="text-xs gap-1"
-              onClick={() => setIsCreatingApp(!isCreatingApp)}
-            >
-              <Plus className="h-4 w-4" /> {isCreatingApp ? 'Close' : 'New Commute Request'}
-            </Button>
-          </div>
 
           {/* New Application Wizard */}
           {isCreatingApp && (
@@ -579,6 +613,7 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+      )}
       </main>
     </div>
   );

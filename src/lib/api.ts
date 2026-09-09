@@ -86,6 +86,8 @@ export const createSchoolAPI = (schoolBaseUrl: string, federationTicket: string)
     },
 
     async updateProfile(data: {
+      role?: 'rider' | 'driver';
+      isOnboarded?: boolean;
       personalEmail?: string;
       userRoles?: string[];
       vehicle?: any;

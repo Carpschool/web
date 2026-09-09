@@ -35,13 +35,25 @@ export default function DriverCorridorPage() {
     setTicket(storedTicket);
 
     const api = createSchoolAPI(url, storedTicket);
+    api.getProfile().then((p) => {
+      if (p && (!p.isOnboarded || !p.role)) {
+        router.push('/onboarding');
+        return;
+      }
+      if (p && p.role === 'rider') {
+        alert('Driver Commute Corridor is exclusive to registered Driver accounts.');
+        router.push('/dashboard');
+        return;
+      }
+    }).catch(() => {});
+
     api.listHomes().then((userHomes) => {
       setHomes(userHomes || []);
       if (userHomes?.length > 0) {
         setSelectedHomeId(userHomes[0]._id);
       }
     }).catch(() => {});
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (!selectedHomeId || !schoolUrl) return;
