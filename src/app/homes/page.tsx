@@ -1,23 +1,37 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { createSchoolAPI } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
-import { Home, ArrowLeft, Plus, MapPin, Trash2 } from 'lucide-react';
+import { Home, ArrowLeft, Plus, MapPin, Trash2, Search, Loader2, CheckCircle2, X } from 'lucide-react';
 
 export default function HomesPage() {
   const [homes, setHomes] = useState<any[]>([]);
   const [label, setLabel] = useState('Primary Home');
-  const [address, setAddress] = useState('1234 Student Blvd, Vancouver, BC');
-  const [latitude, setLatitude] = useState(49.2606);
-  const [longitude, setLongitude] = useState(-123.246);
+  const [address, setAddress] = useState('5959 Student Union Blvd, Vancouver, BC');
+  const [latitude, setLatitude] = useState<number | null>(49.2606);
+  const [longitude, setLongitude] = useState<number | null>(-123.246);
   const [radius, setRadius] = useState(75); // 10m to 200m
   const [schoolUrl, setSchoolUrl] = useState('');
   const [ticket, setTicket] = useState('');
+
+  // Search & autocomplete states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [predictions, setPredictions] = useState<Array<{
+    placeId: string;
+    description: string;
+    mainText: string;
+    secondaryText: string;
+  }>>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const skipNextSearchRef = useRef<boolean>(false);
 
   useEffect(() => {
     const url = localStorage.getItem('selected_school_url') || 'http://localhost:5001';
@@ -29,19 +43,91 @@ export default function HomesPage() {
     api.listHomes().then((data) => setHomes(data || [])).catch(() => {});
   }, []);
 
+  // Debounced places autocomplete search
+  useEffect(() => {
+    if (skipNextSearchRef.current) {
+      skipNextSearchRef.current = false;
+      return;
+    }
+
+    if (!searchQuery.trim() || searchQuery.trim().length < 2) {
+      setPredictions([]);
+      setShowDropdown(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`/api/places/autocomplete?input=${encodeURIComponent(searchQuery.trim())}`);
+        const data = await res.json();
+        if (data.predictions) {
+          setPredictions(data.predictions);
+          setShowDropdown(data.predictions.length > 0);
+        }
+      } catch (err) {
+        console.error('Failed to autocomplete place:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 280);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Click outside to close dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectPrediction = async (prediction: { placeId: string; description: string; mainText: string }) => {
+    setIsResolving(true);
+    setShowDropdown(false);
+    skipNextSearchRef.current = true;
+    setSearchQuery(prediction.description);
+    try {
+      const res = await fetch(`/api/places/details?place_id=${encodeURIComponent(prediction.placeId)}`);
+      const data = await res.json();
+      if (data.latitude && data.longitude) {
+        setLatitude(data.latitude);
+        setLongitude(data.longitude);
+        setAddress(data.formattedAddress || prediction.description);
+      } else {
+        alert(data.error || 'Failed to resolve location coordinates');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error resolving place details');
+    } finally {
+      setIsResolving(false);
+    }
+  };
+
   const handleCreateHome = async () => {
-    if (!address.trim()) return;
+    if (!address.trim()) {
+      alert('Please enter or search for an address');
+      return;
+    }
+    if (latitude === null || longitude === null) {
+      alert('Please search and select a location from Google Maps to resolve coordinates');
+      return;
+    }
     try {
       const api = createSchoolAPI(schoolUrl, ticket);
       const newHome = await api.createHome({
         label,
         address,
-        latitude: Number(latitude) || 49.2606,
-        longitude: Number(longitude) || -123.246,
+        latitude,
+        longitude,
         walkingRadiusMeters: radius,
       });
       setHomes((prev) => [...prev, newHome]);
-      setAddress('');
+      setSearchQuery('');
       alert('Home location saved successfully!');
     } catch (err: any) {
       alert(err.message || 'Failed to save home location');
@@ -92,35 +178,107 @@ export default function HomesPage() {
               />
             </div>
 
+            {/* Google Maps Places Search */}
+            <div className="space-y-1.5 relative" ref={dropdownRef}>
+              <label className="font-medium text-slate-700 flex items-center justify-between">
+                <span>Google Maps Address Search</span>
+                <span className="text-[10px] text-muted-foreground font-normal flex items-center gap-1">
+                  Powered by Google Maps
+                </span>
+              </label>
+
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  {isSearching || isResolving ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                </div>
+                <Input
+                  type="text"
+                  placeholder="Search street, dorm, neighborhood, or landmark..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setShowDropdown(true);
+                  }}
+                  onFocus={() => {
+                    if (predictions.length > 0) setShowDropdown(true);
+                  }}
+                  className="pl-9 pr-8 text-xs"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setPredictions([]);
+                      setShowDropdown(false);
+                    }}
+                    className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Autocomplete Dropdown */}
+              {showDropdown && predictions.length > 0 && (
+                <div className="absolute z-50 left-0 right-0 mt-1 bg-white rounded-md shadow-lg border border-slate-200 max-h-60 overflow-y-auto divide-y divide-slate-100">
+                  {predictions.map((p) => (
+                    <button
+                      key={p.placeId}
+                      type="button"
+                      onClick={() => handleSelectPrediction(p)}
+                      className="w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors flex items-start gap-2.5"
+                    >
+                      <MapPin className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <div className="font-medium text-slate-800 text-xs truncate">{p.mainText}</div>
+                        {p.secondaryText && (
+                          <div className="text-[11px] text-slate-500 truncate">{p.secondaryText}</div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Selected Address Display */}
             <div className="space-y-1">
-              <label className="font-medium text-slate-700">Street Address</label>
+              <label className="font-medium text-slate-700">Selected Address</label>
               <Input
-                placeholder="e.g. 5959 Student Union Blvd"
+                placeholder="Selected address will appear here"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
+                className="text-xs bg-slate-50/50"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="font-medium text-slate-700">Latitude</label>
-                <Input
-                  type="number"
-                  step="any"
-                  value={latitude}
-                  onChange={(e) => setLatitude(parseFloat(e.target.value) || 0)}
-                />
+            {/* Resolved GPS Coordinates Badge (Replaces manual lat/lng inputs) */}
+            {latitude !== null && longitude !== null ? (
+              <div className="flex items-center justify-between p-2.5 bg-emerald-50/80 border border-emerald-200 rounded-md text-emerald-800 text-xs">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <div>
+                    <span className="font-medium">GPS Coordinates: </span>
+                    <span className="font-mono font-semibold">
+                      {latitude.toFixed(6)}, {longitude.toFixed(6)}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-emerald-100 text-emerald-700 font-medium px-2 py-0.5 rounded-full">
+                  Google Maps Verified
+                </span>
               </div>
-              <div className="space-y-1">
-                <label className="font-medium text-slate-700">Longitude</label>
-                <Input
-                  type="number"
-                  step="any"
-                  value={longitude}
-                  onChange={(e) => setLongitude(parseFloat(e.target.value) || 0)}
-                />
+            ) : (
+              <div className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-xs">
+                <Search className="h-4 w-4 text-amber-600 shrink-0" />
+                <span>Type an address above to resolve precise GPS coordinates.</span>
               </div>
-            </div>
+            )}
 
             {/* Walking Radius Slider: 10m to 200m */}
             <div className="space-y-2 pt-2 border-t">
