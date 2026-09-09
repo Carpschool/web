@@ -188,5 +188,44 @@ export const createSchoolAPI = (schoolBaseUrl: string, federationTicket: string)
       );
       return res.json();
     },
+
+    async getCarpool(id: string) {
+      const res = await fetch(`${schoolBaseUrl}/api/v1/carpools/${id}`, { headers });
+      return res.json();
+    },
+
+    async boardPassenger(carpoolId: string, data: { riderId: string; pin: string; latitude: number; longitude: number }) {
+      const res = await fetch(`${schoolBaseUrl}/api/v1/carpools/${carpoolId}/board-passenger`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async endRide(carpoolId: string, data: { latitude: number; longitude: number }) {
+      const res = await fetch(`${schoolBaseUrl}/api/v1/carpools/${carpoolId}/end-ride`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async deleteHome(id: string) {
+      const res = await fetch(`${schoolBaseUrl}/api/v1/homes/${id}`, {
+        method: 'DELETE',
+        headers,
+      });
+      return res.json();
+    },
+
+    async cancelApplication(id: string) {
+      const res = await fetch(`${schoolBaseUrl}/api/v1/applications/${id}`, {
+        method: 'DELETE',
+        headers,
+      });
+      return res.json();
+    },
   };
 };

@@ -13,14 +13,16 @@ export default function HomesPage() {
   const [homes, setHomes] = useState<any[]>([]);
   const [label, setLabel] = useState('Primary Home');
   const [address, setAddress] = useState('1234 Student Blvd, Vancouver, BC');
+  const [latitude, setLatitude] = useState(49.2606);
+  const [longitude, setLongitude] = useState(-123.246);
   const [radius, setRadius] = useState(75); // 10m to 200m
   const [schoolUrl, setSchoolUrl] = useState('');
   const [ticket, setTicket] = useState('');
 
   useEffect(() => {
-    const url = localStorage.getItem('selected_school_url') || 'http://localhost:5000';
+    const url = localStorage.getItem('selected_school_url') || 'http://localhost:5001';
     setSchoolUrl(url);
-    const storedTicket = 'mock_user_123'; // In production, retrieved from state
+    const storedTicket = localStorage.getItem('federation_ticket') || 'mock_student_alice';
     setTicket(storedTicket);
 
     const api = createSchoolAPI(url, storedTicket);
@@ -34,15 +36,26 @@ export default function HomesPage() {
       const newHome = await api.createHome({
         label,
         address,
-        latitude: 49.2606,
-        longitude: -123.246,
+        latitude: Number(latitude) || 49.2606,
+        longitude: Number(longitude) || -123.246,
         walkingRadiusMeters: radius,
       });
       setHomes((prev) => [...prev, newHome]);
       setAddress('');
       alert('Home location saved successfully!');
     } catch (err: any) {
-      alert(err.message);
+      alert(err.message || 'Failed to save home location');
+    }
+  };
+
+  const handleDeleteHome = async (id: string) => {
+    if (!confirm('Are you sure you want to remove this saved location?')) return;
+    try {
+      const api = createSchoolAPI(schoolUrl, ticket);
+      await api.deleteHome(id);
+      setHomes((prev) => prev.filter((h) => h._id !== id));
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete home');
     }
   };
 
@@ -86,6 +99,27 @@ export default function HomesPage() {
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="font-medium text-slate-700">Latitude</label>
+                <Input
+                  type="number"
+                  step="any"
+                  value={latitude}
+                  onChange={(e) => setLatitude(parseFloat(e.target.value) || 0)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="font-medium text-slate-700">Longitude</label>
+                <Input
+                  type="number"
+                  step="any"
+                  value={longitude}
+                  onChange={(e) => setLongitude(parseFloat(e.target.value) || 0)}
+                />
+              </div>
             </div>
 
             {/* Walking Radius Slider: 10m to 200m */}
@@ -134,11 +168,23 @@ export default function HomesPage() {
                     <div>
                       <h4 className="font-semibold text-slate-900">{h.label}</h4>
                       <p className="text-slate-500">{h.address}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                        [{h.location?.coordinates?.[1]?.toFixed(4) ?? h.latitude}, {h.location?.coordinates?.[0]?.toFixed(4) ?? h.longitude}]
+                      </p>
                       <p className="text-primary font-medium mt-1">
                         Walking radius: {h.walkingRadiusMeters} meters
                       </p>
                     </div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                    onClick={() => handleDeleteHome(h._id)}
+                    title="Delete location"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </CardContent>
               </Card>
             ))
