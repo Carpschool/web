@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const placeId = searchParams.get('place_id');
+  const placeId = searchParams.get('place_id') || searchParams.get('placeId');
 
   if (!placeId) {
     return NextResponse.json({ error: 'place_id is required' }, { status: 400 });

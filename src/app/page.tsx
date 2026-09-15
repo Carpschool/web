@@ -28,7 +28,7 @@ export default function LandingPage() {
     localStorage.setItem('selected_school_code', school.schoolCode);
     localStorage.setItem('selected_school_url', school.baseUrl);
     localStorage.setItem('is_trusted_school', 'true');
-    router.push('/dashboard');
+    router.push('/onboarding');
   };
 
   const handleSelectCustom = () => {
@@ -37,7 +37,7 @@ export default function LandingPage() {
     localStorage.setItem('selected_school_code', 'custom');
     localStorage.setItem('selected_school_url', cleanUrl);
     localStorage.setItem('is_trusted_school', 'false');
-    router.push('/dashboard');
+    router.push('/onboarding');
   };
 
   return (

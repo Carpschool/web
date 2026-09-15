@@ -62,6 +62,11 @@ export const createSchoolAPI = (schoolBaseUrl: string, federationTicket: string)
   };
 
   return {
+    async getMetadata() {
+      const res = await fetch(`${schoolBaseUrl}/api/v1/meta`);
+      return res.json();
+    },
+
     async getProfile() {
       const res = await fetch(`${schoolBaseUrl}/api/v1/auth/me`, { headers });
       return res.json();
