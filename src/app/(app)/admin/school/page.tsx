@@ -101,7 +101,7 @@ function SettingsForm({ s, save, done, testRules }: { s: Settings; save: (b: any
   const set = (k: keyof ReturnType<typeof init>) => (e: React.ChangeEvent<HTMLInputElement>) => setF(x => ({ ...x, [k]: e.target.value }));
   const num = (v: string, lo: number, hi: number) => /^-?\d+(\.\d+)?$/.test(v.trim()) && +v >= lo && +v <= hi;
   const int = (v: string, lo: number, hi: number) => /^\d+$/.test(v.trim()) && +v >= lo && +v <= hi;
-  const errs = { officialName: f.officialName.trim().length < 2, campusName: !f.campusName.trim(), lat: !num(f.lat, -90, 90), lng: !num(f.lng, -180, 180), rules: !f.rules.length || f.rules.some(r => !r.value.trim() || (r.type === 'domain' && !DOMAIN.test(r.value))), seats: !int(f.seats, 1, 12), homes: !int(f.homes, 1, 50), perEmail: !int(f.perEmail, 1, 20) };
+  const errs = { officialName: f.officialName.trim().length < 2, campusName: !f.campusName.trim(), lat: !num(f.lat, -90, 90), lng: !num(f.lng, -180, 180), rules: !f.rules.length || f.rules.some(r => !r.value.trim() || !!ruleError(r)), seats: !int(f.seats, 1, 12), homes: !int(f.homes, 1, 50), perEmail: !int(f.perEmail, 1, 20) };
   const bad = Object.values(errs).some(Boolean);
   const dirty = JSON.stringify(f) !== JSON.stringify(init());
   const submit = () => run({ officialName: f.officialName.trim(), campus: { name: f.campusName.trim(), address: f.address.trim(), latitude: +f.lat, longitude: +f.lng }, emailRules: f.rules.map(r => ({ type: r.type, value: r.value.trim() })), limits: { maxCarpoolStudents: +f.seats, maxHomesPerUser: +f.homes, maxUsersPerEduEmail: +f.perEmail } }, 'School settings saved');
@@ -175,11 +175,23 @@ function MailerForm({ s, save, done }: { s: Settings; save: (b: any) => Promise<
 
 type Rule = { type: 'domain' | 'regex'; value: string };
 /** Ordered list of domain/regex rules plus a live tester that runs the exact server matcher (RE2, anchored). */
+/** Client-side mirror of the server's RE2 check: JS syntax + RE2's missing features. Server stays authoritative. */
+function regexError(p: string): string | null {
+  if (!p.trim()) return null;
+  if (/\(\?<?[=!]/.test(p)) return 'Lookarounds like (?= aren\u2019t supported (RE2)';
+  if (/\\[1-9]|\\k</.test(p)) return 'Backreferences aren\u2019t supported (RE2)';
+  try { new RegExp('^(?:' + p + ')$', 'i'); return null; } catch (e) { return 'Invalid regex: ' + String((e as Error).message).replace(/^Invalid regular expression: \/.*\/i?: /, ''); }
+}
+function ruleError(r: Rule): string | null {
+  if (!r.value) return null;
+  if (r.type === 'domain') return DOMAIN.test(r.value) ? null : 'Enter just the domain, like school.edu (no http://, no @, no double dots)';
+  return regexError(r.value);
+}
 function EmailRules({ rules, onChange, api }: { rules: Rule[]; onChange: (r: Rule[]) => void; api: (b: any) => Promise<any> }) {
   const set = (i: number, r: Partial<Rule>) => onChange(rules.map((x, j) => j === i ? { ...x, ...r } : x));
   const [email, setEmail] = useState('');
   const [res, setRes] = useState<{ ok?: boolean; matched?: Rule | null; error?: string } | null>(null);
-  const valid = rules.length > 0 && rules.every(r => r.value.trim());
+  const valid = rules.length > 0 && rules.every(r => r.value.trim() && !ruleError(r));
   useEffect(() => {
     if (!email.includes('@') || !valid) { setRes(null); return; }
     let live = true;
@@ -198,7 +210,7 @@ function EmailRules({ rules, onChange, api }: { rules: Rule[]; onChange: (r: Rul
         placeholder={r.type === 'domain' ? 'school.edu' : '[a-z]+\\.[0-9]{2}@students\\.school\\.edu'}
         inputProps={{ maxLength: r.type === 'regex' ? 200 : 253, spellCheck: false, style: r.type === 'regex' ? { fontFamily: 'var(--font-mono), monospace' } : undefined }}
         onChange={e => set(i, { value: r.type === 'domain' ? e.target.value.trim().toLowerCase().replace(/^@/, '') : e.target.value })}
-        error={!!r.value && r.type === 'domain' && !DOMAIN.test(r.value)}
+        error={!!ruleError(r)} helperText={ruleError(r) || undefined}
         color={hit(r) ? 'success' : undefined} focused={hit(r) || undefined}
         InputProps={r.type === 'domain' ? { startAdornment: <InputAdornment position="start">@</InputAdornment> } : undefined} />
       <Button color="error" size="small" sx={{ mt: 0.5, minWidth: 0, flexShrink: 0 }} disabled={rules.length === 1} onClick={() => onChange(rules.filter((_, j) => j !== i))} aria-label={'Remove rule ' + (i + 1)}>Remove</Button>
@@ -212,7 +224,7 @@ function EmailRules({ rules, onChange, api }: { rules: Rule[]; onChange: (r: Rul
       <TextField size="small" fullWidth label="Test an email" placeholder="student@school.edu" value={email} onChange={e => setEmail(e.target.value)} inputProps={{ spellCheck: false, autoCapitalize: 'none' }} />
       <Box sx={{ mt: 1, minHeight: 24 }} aria-live="polite">
         {!email.includes('@') ? <Typography variant="body2" color="text.secondary">Type an address to check it against the rules above (unsaved changes included).</Typography>
-          : !valid ? <Typography variant="body2" color="text.secondary">Fill in every rule first.</Typography>
+          : !valid ? <Typography variant="body2" color="text.secondary">{rules.some(r => ruleError(r)) ? 'Fix the highlighted rule first.' : 'Fill in every rule first.'}</Typography>
           : res?.error ? <Alert severity="error" sx={{ py: 0 }}>{res.error}</Alert>
           : res == null ? <Typography variant="body2" color="text.secondary">Checking…</Typography>
           : res.ok ? <Alert severity="success" sx={{ py: 0 }}>Allowed by {res.matched!.type} rule <code>{res.matched!.value}</code></Alert>
