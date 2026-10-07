@@ -46,10 +46,10 @@ export default function SchoolAdmin() {
         <TextField select size="small" value={r.status} sx={{ width: 140, flexShrink: 0 }} label="Status" onChange={e => act(() => api('/admin/reports/' + r._id, { method: 'PUT', body: { status: e.target.value } }), 'Report updated', reports.refetch)}>
           {['open', 'resolved', 'dismissed'].map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}</TextField></Stack></Card>)}</Stack>)}
     {tab >= 2 && (settings.isLoading ? <Loading rows={3} h={56} /> : settings.error ? <ErrorState error={settings.error} retry={settings.refetch} /> : settings.data &&
-      (tab === 2 ? <SettingsForm s={settings.data} save={b => api('/admin/settings', { method: 'PUT', body: b })} done={settings.refetch} /> : <MailerForm s={settings.data} save={b => api('/admin/settings', { method: 'PUT', body: b })} done={settings.refetch} />))}
+      (tab === 2 ? <SettingsForm s={settings.data} save={b => api('/admin/settings', { method: 'PUT', body: b })} testRules={b => api('/admin/email-rules/test', { method: 'POST', body: b })} done={settings.refetch} /> : <MailerForm s={settings.data} save={b => api('/admin/settings', { method: 'PUT', body: b })} done={settings.refetch} />))}
   </>);
 }
-type Settings = { officialName: string; campus: { name: string; address: string; latitude: number; longitude: number }; domains: string[]; limits: { maxCarpoolStudents: number; maxHomesPerUser: number; maxUsersPerEduEmail: number }; mailer: { provider: string; gmailUser?: string; fromName: string; clientId?: string; clientSecretSet: boolean; refreshTokenSet: boolean; configured: boolean } };
+type Settings = { officialName: string; campus: { name: string; address: string; latitude: number; longitude: number }; emailRules: Rule[]; limits: { maxCarpoolStudents: number; maxHomesPerUser: number; maxUsersPerEduEmail: number }; mailer: { provider: string; gmailUser?: string; fromName: string; clientId?: string; clientSecretSet: boolean; refreshTokenSet: boolean; configured: boolean } };
 const DOMAIN = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 function Section({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return <Box><Typography variant="subtitle1" fontWeight={700} component="h2">{title}</Typography>{sub && <Typography variant="body2" color="text.secondary">{sub}</Typography>}<Stack gap={2} sx={{ mt: 1.5 }}>{children}</Stack></Box>;
@@ -58,17 +58,17 @@ function useSaver(save: (b: any) => Promise<any>, done: () => any) {
   const toast = useToast(); const [busy, setBusy] = useState(false);
   return { busy, run: async (b: any, ok: string) => { setBusy(true); try { await save(b); toast(ok); await done(); } catch (e) { toast(errText(e), 'error'); } finally { setBusy(false); } } };
 }
-function SettingsForm({ s, save, done }: { s: Settings; save: (b: any) => Promise<any>; done: () => any }) {
-  const init = () => ({ officialName: s.officialName, campusName: s.campus.name, address: s.campus.address, lat: String(s.campus.latitude), lng: String(s.campus.longitude), domains: s.domains, seats: String(s.limits.maxCarpoolStudents), homes: String(s.limits.maxHomesPerUser), perEmail: String(s.limits.maxUsersPerEduEmail) });
+function SettingsForm({ s, save, done, testRules }: { s: Settings; save: (b: any) => Promise<any>; done: () => any; testRules: (b: any) => Promise<any> }) {
+  const init = () => ({ officialName: s.officialName, campusName: s.campus.name, address: s.campus.address, lat: String(s.campus.latitude), lng: String(s.campus.longitude), rules: s.emailRules, seats: String(s.limits.maxCarpoolStudents), homes: String(s.limits.maxHomesPerUser), perEmail: String(s.limits.maxUsersPerEduEmail) });
   const [f, setF] = useState(init); useEffect(() => setF(init()), [s]); // eslint-disable-line
   const { busy, run } = useSaver(save, done);
   const set = (k: keyof ReturnType<typeof init>) => (e: React.ChangeEvent<HTMLInputElement>) => setF(x => ({ ...x, [k]: e.target.value }));
   const num = (v: string, lo: number, hi: number) => /^-?\d+(\.\d+)?$/.test(v.trim()) && +v >= lo && +v <= hi;
   const int = (v: string, lo: number, hi: number) => /^\d+$/.test(v.trim()) && +v >= lo && +v <= hi;
-  const errs = { officialName: f.officialName.trim().length < 2, campusName: !f.campusName.trim(), lat: !num(f.lat, -90, 90), lng: !num(f.lng, -180, 180), domains: !f.domains.length || f.domains.some(d => !DOMAIN.test(d)), seats: !int(f.seats, 1, 12), homes: !int(f.homes, 1, 50), perEmail: !int(f.perEmail, 1, 20) };
+  const errs = { officialName: f.officialName.trim().length < 2, campusName: !f.campusName.trim(), lat: !num(f.lat, -90, 90), lng: !num(f.lng, -180, 180), rules: !f.rules.length || f.rules.some(r => !r.value.trim() || (r.type === 'domain' && !DOMAIN.test(r.value))), seats: !int(f.seats, 1, 12), homes: !int(f.homes, 1, 50), perEmail: !int(f.perEmail, 1, 20) };
   const bad = Object.values(errs).some(Boolean);
   const dirty = JSON.stringify(f) !== JSON.stringify(init());
-  const submit = () => run({ officialName: f.officialName.trim(), campus: { name: f.campusName.trim(), address: f.address.trim(), latitude: +f.lat, longitude: +f.lng }, domains: f.domains, limits: { maxCarpoolStudents: +f.seats, maxHomesPerUser: +f.homes, maxUsersPerEduEmail: +f.perEmail } }, 'School settings saved');
+  const submit = () => run({ officialName: f.officialName.trim(), campus: { name: f.campusName.trim(), address: f.address.trim(), latitude: +f.lat, longitude: +f.lng }, emailRules: f.rules.map(r => ({ type: r.type, value: r.value.trim() })), limits: { maxCarpoolStudents: +f.seats, maxHomesPerUser: +f.homes, maxUsersPerEduEmail: +f.perEmail } }, 'School settings saved');
   return (<Card component="form" sx={{ p: { xs: 2, sm: 3 } }} onSubmit={e => { e.preventDefault(); if (!bad && dirty) submit(); }}>
     <Stack gap={3} divider={<Divider flexItem />}>
       <Section title="School"><TextField label="Official name" value={f.officialName} onChange={set('officialName')} error={errs.officialName} helperText={errs.officialName ? 'At least 2 characters' : 'Shown to students when they pick a school'} required /></Section>
@@ -81,10 +81,8 @@ function SettingsForm({ s, save, done }: { s: Settings; save: (b: any) => Promis
           <TextField label="Longitude" inputMode="decimal" value={f.lng} onChange={set('lng')} error={errs.lng} helperText={errs.lng ? '-180 to 180' : ' '} />
         </Stack>
       </Section>
-      <Section title="Allowed email domains" sub="Students must verify an address at one of these. Press Enter after each.">
-        <Autocomplete multiple freeSolo options={[] as string[]} value={f.domains} onChange={(_, v) => setF(x => ({ ...x, domains: [...new Set((v as string[]).map(d => d.trim().toLowerCase().replace(/^@/, '')).filter(Boolean))] }))}
-          renderValue={(v, getProps) => v.map((d, i) => { const { key, ...p } = getProps({ index: i }); return <Chip key={key} {...p} label={'@' + d} color={DOMAIN.test(d) ? 'default' : 'error'} size="small" />; })}
-          renderInput={p => <TextField {...p} label="Domains" placeholder="school.edu" error={errs.domains} helperText={errs.domains ? 'Add at least one valid domain' : ' '} />} />
+      <Section title="Who can sign up" sub="A school email must match at least one rule. Domain rules are also shown publicly to help students pick their school; regex rules are private.">
+        <EmailRules rules={f.rules} onChange={rules => setF(x => ({ ...x, rules }))} api={testRules} />
       </Section>
       <Section title="Limits">
         <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
@@ -137,4 +135,53 @@ function MailerForm({ s, save, done }: { s: Settings; save: (b: any) => Promise<
       <Button type="submit" variant="contained" disabled={!dirty || emailBad || busy}>{busy ? 'Saving…' : 'Save mailer'}</Button>
     </Stack>
   </Card>);
+}
+
+type Rule = { type: 'domain' | 'regex'; value: string };
+/** Ordered list of domain/regex rules plus a live tester that runs the exact server matcher (RE2, anchored). */
+function EmailRules({ rules, onChange, api }: { rules: Rule[]; onChange: (r: Rule[]) => void; api: (b: any) => Promise<any> }) {
+  const set = (i: number, r: Partial<Rule>) => onChange(rules.map((x, j) => j === i ? { ...x, ...r } : x));
+  const [email, setEmail] = useState('');
+  const [res, setRes] = useState<{ ok?: boolean; matched?: Rule | null; error?: string } | null>(null);
+  const valid = rules.length > 0 && rules.every(r => r.value.trim());
+  useEffect(() => {
+    if (!email.includes('@') || !valid) { setRes(null); return; }
+    let live = true;
+    const t = setTimeout(() => api({ email, rules: rules.map(r => ({ type: r.type, value: r.value.trim() })) })
+      .then(x => live && setRes({ ok: x.allowed, matched: x.matched }))
+      .catch(e => live && setRes({ error: errText(e) })), 350);
+    return () => { live = false; clearTimeout(t); };
+  }, [email, JSON.stringify(rules)]);
+  const hit = (r: Rule) => !!res?.matched && res.matched.type === r.type && res.matched.value === r.value.trim();
+  return <Stack spacing={1.5}>
+    {rules.map((r, i) => <Stack key={i} direction="row" spacing={1} alignItems="flex-start">
+      <TextField select size="small" label="Type" value={r.type} sx={{ width: 112, flexShrink: 0 }} onChange={e => set(i, { type: e.target.value as Rule['type'] })}>
+        <MenuItem value="domain">Domain</MenuItem><MenuItem value="regex">Regex</MenuItem>
+      </TextField>
+      <TextField size="small" fullWidth label={r.type === 'domain' ? 'Domain' : 'Pattern (matches the whole email)'} value={r.value}
+        placeholder={r.type === 'domain' ? 'school.edu' : '[a-z]+\\.[0-9]{2}@students\\.school\\.edu'}
+        inputProps={{ maxLength: r.type === 'regex' ? 200 : 253, spellCheck: false, style: r.type === 'regex' ? { fontFamily: 'var(--font-mono), monospace' } : undefined }}
+        onChange={e => set(i, { value: r.type === 'domain' ? e.target.value.trim().toLowerCase().replace(/^@/, '') : e.target.value })}
+        error={!!r.value && r.type === 'domain' && !DOMAIN.test(r.value)}
+        color={hit(r) ? 'success' : undefined} focused={hit(r) || undefined}
+        InputProps={r.type === 'domain' ? { startAdornment: <InputAdornment position="start">@</InputAdornment> } : undefined} />
+      <Button color="error" size="small" sx={{ mt: 0.5, minWidth: 0, flexShrink: 0 }} disabled={rules.length === 1} onClick={() => onChange(rules.filter((_, j) => j !== i))} aria-label={'Remove rule ' + (i + 1)}>Remove</Button>
+    </Stack>)}
+    <Stack direction="row" spacing={1}>
+      <Button size="small" variant="outlined" onClick={() => onChange([...rules, { type: 'domain', value: '' }])}>Add domain</Button>
+      <Button size="small" variant="outlined" onClick={() => onChange([...rules, { type: 'regex', value: '' }])}>Add regex</Button>
+    </Stack>
+    <Typography variant="caption" color="text.secondary">Regex uses RE2 syntax and is case-insensitive and anchored automatically, so it has to match the whole address. No lookarounds or backreferences. 200 characters max.</Typography>
+    <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}>
+      <TextField size="small" fullWidth label="Test an email" placeholder="student@school.edu" value={email} onChange={e => setEmail(e.target.value)} inputProps={{ spellCheck: false, autoCapitalize: 'none' }} />
+      <Box sx={{ mt: 1, minHeight: 24 }} aria-live="polite">
+        {!email.includes('@') ? <Typography variant="body2" color="text.secondary">Type an address to check it against the rules above (unsaved changes included).</Typography>
+          : !valid ? <Typography variant="body2" color="text.secondary">Fill in every rule first.</Typography>
+          : res?.error ? <Alert severity="error" sx={{ py: 0 }}>{res.error}</Alert>
+          : res == null ? <Typography variant="body2" color="text.secondary">Checking…</Typography>
+          : res.ok ? <Alert severity="success" sx={{ py: 0 }}>Allowed by {res.matched!.type} rule <code>{res.matched!.value}</code></Alert>
+          : <Alert severity="warning" sx={{ py: 0 }}>Not allowed. No rule matches.</Alert>}
+      </Box>
+    </Box>
+  </Stack>;
 }
