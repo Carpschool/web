@@ -42,7 +42,9 @@ export default function Ride({ params }: { params: Promise<{ id: string }> }) {
   const [leave, setLeave] = useState<Passenger | null>(null); const [drop, setDrop] = useState<Passenger | null>(null);
   if (q.isLoading) return <Loading rows={3} />;
   if (q.error || !q.data) return <ErrorState error={q.error ?? 'Ride not found'} retry={q.refetch} />;
-  const d = q.data; const ps = [...d.passengers].sort((a, b) => a.time.localeCompare(b.time)); const today = runsToday(d);
+  const d = q.data; const ps = [...d.passengers].sort((a, b) => a.time.localeCompare(b.time));
+  // Only the driver's view includes the route (riders never see the driver's full path).
+  const route: [number, number][] = (d as any).route?.coordinates?.map(([a, b]: [number, number]) => [b, a] as [number, number]) ?? []; const today = runsToday(d);
   async function getPin() { setPinBusy(true); try { const r = await api('/carpools/' + id + '/pin', { method: 'POST' }); setPin(r.pin); } catch (e) { toast(errText(e), 'error'); } finally { setPinBusy(false); } }
   async function doBoard() {
     if (!board) return; setBBusy(true); setBErr('');
@@ -75,7 +77,9 @@ export default function Ride({ params }: { params: Promise<{ id: string }> }) {
           <SafetyMenu subject={d.owner} who={'driver ' + shortId(d.owner)} />
         </Stack>
       </Box>); }) : (<>
-      {ps.length > 0 && <Card sx={{ mb: 3, overflow: 'hidden' }}><MapView center={[ps[0].pickup.coordinates[1], ps[0].pickup.coordinates[0]]} fit height={240} markers={ps.filter(p => p.status !== 'left').map((p, i) => ({ pos: [p.pickup.coordinates[1], p.pickup.coordinates[0]] as [number, number], color: p.status === 'locked' ? '#F2A900' : '#2F7A57', label: `${i + 1}. ${p.time}` }))} label="Pickups in order" /></Card>}
+      {ps.length > 0 && <Card sx={{ mb: 3, overflow: 'hidden' }}><MapView center={[ps[0].pickup.coordinates[1], ps[0].pickup.coordinates[0]]} fit height={240} line={route.length > 1 ? route : undefined} markers={[
+          ...ps.filter(p => p.status !== 'left').map((p, i) => ({ pos: [p.pickup.coordinates[1], p.pickup.coordinates[0]] as [number, number], color: p.status === 'locked' ? '#F2A900' : '#2F7A57', label: `${i + 1}. ${p.time}` })),
+          ...(route.length > 1 ? [{ pos: route[route.length - 1], color: '#C4462B', label: d.direction === 'to-school' ? 'School' : 'Home' }] : [])]} label={route.length > 1 ? 'Route and pickups in order' : 'Pickups in order'} /></Card>}
       <Typography variant="h6" component="h2" sx={{ mb: 1.5 }}>Pickups in order</Typography>
       <Stack gap={1.5}>{ps.map((p, i) => { const [l, c] = label[p.status] ?? [p.status, 'default']; return (
         <Card key={p._id} sx={{ p: 2 }} className="rise"><Stack direction="row" alignItems="center" gap={2}>
