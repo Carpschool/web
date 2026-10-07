@@ -32,17 +32,17 @@ const nav = [
   { href: '/settings', label: 'Settings', icon: <SettingsOutlined /> },
 ];
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { school, schools, schoolsError, me, meState, meError, refreshMe, flags } = useSchool(); const router = useRouter(); const path = usePathname();
+  const { picking, school, schools, schoolsError, me, meState, meError, refreshMe, flags } = useSchool(); const router = useRouter(); const path = usePathname();
   const isAdminPage = path.startsWith('/admin');
   useEffect(() => {
     if (isAdminPage && path.startsWith('/admin/central')) return;
-    if (schools && !school) router.replace('/school');
+    if (schools && !school) { if (!picking) router.replace('/school'); }
     else if (meState === 'ready' && !me?.verified) router.replace('/verify');
     else if (meState === 'ready' && !me?.role) router.replace('/role');
-  }, [schools, school, me, meState, router, isAdminPage, path]);
+  }, [schools, school, picking, me, meState, router, isAdminPage, path]);
   const ready = (me?.verified && me.role) || path.startsWith('/admin/central');
   const extra = [
-    ...(flags?.schoolAdminOf.includes(school?._id || '-') ? [{ href: '/admin/school', label: 'School admin', icon: <AdminPanelSettingsOutlined /> }] : []),
+    ...(!!flags?.schoolAdminOf.length ? [{ href: '/admin/school', label: 'School admin', icon: <AdminPanelSettingsOutlined /> }] : []),
     ...(flags?.admin ? [{ href: '/admin/central', label: 'Network admin', icon: <HubOutlined /> }] : []),
   ];
   const active = nav.find(n => path.startsWith(n.href))?.href ?? false;

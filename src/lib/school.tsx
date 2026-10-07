@@ -19,9 +19,9 @@ type Opts = { method?: string; body?: unknown };
 type Ctx = {
   central: string; schools: School[] | null; schoolsError: string | null; school: School | null; meta: SchoolMeta | null;
   me: Me | null; meState: 'idle' | 'loading' | 'ready' | 'error'; meError: string | null;
-  flags: { admin: boolean; schoolAdminOf: string[] } | null;
+  picking: boolean; flags: { admin: boolean; schoolAdminOf: string[] } | null;
   chooseSchool: (s: School | null) => void; refreshMe: () => Promise<Me | null>;
-  api: <T = any>(path: string, o?: Opts) => Promise<T>; centralApi: <T = any>(path: string, o?: Opts) => Promise<T>;
+  api: <T = any>(path: string, o?: Opts) => Promise<T>; apiFor: <T = any>(s: School, path: string, o?: Opts) => Promise<T>; centralApi: <T = any>(path: string, o?: Opts) => Promise<T>;
   token: () => Promise<string>; reloadSchools: () => void;
 };
 const C = createContext<Ctx | null>(null);
@@ -40,8 +40,8 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
   const [meError, setMeError] = useState<string | null>(null);
   const [flags, setFlags] = useState<Ctx['flags']>(null);
   const [n, setN] = useState(0);
-  const tok = useRef<{ code: string; token: string; exp: number; user: string } | null>(null);
-  const inflight = useRef<Promise<string> | null>(null);
+  const toks = useRef<Record<string, { code: string; token: string; exp: number; user: string }>>({});
+  const flight = useRef<Record<string, Promise<string>>>({});
 
   useEffect(() => { setCode(localStorage.getItem(KEY)); }, []);
   useEffect(() => { (async () => {
@@ -59,19 +59,29 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
     return parse(await fetch(central + path, { method: o.method ?? (o.body ? 'POST' : 'GET'), headers: { Authorization: 'Bearer ' + jwt, ...(o.body ? { 'Content-Type': 'application/json' } : {}) }, body: o.body ? JSON.stringify(o.body) : undefined }));
   }, [central, getToken]);
 
+  // Session tokens per school (memory only, singleflight per school) so admins of several schools can switch without touching the active school.
+  const tokenFor = useCallback(async (sc: School, force = false) => {
+    if (!userId) throw new ApiError('Signed out', 401);
+    const t = toks.current[sc.schoolCode];
+    if (!force && t && t.user === userId && t.exp - Date.now() > 30_000) return t.token;
+    const fl = flight.current[sc.schoolCode]; if (fl) return fl;
+    const p = (async () => {
+      const { ticket } = await centralApi('/tickets', { body: { schoolCode: sc.schoolCode } });
+      const s = await parse(await fetch(sc.baseUrl + '/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket }) }));
+      toks.current[sc.schoolCode] = { code: sc.schoolCode, token: s.token, exp: new Date(s.expiresAt).getTime(), user: userId };
+      return s.token as string;
+    })().finally(() => { delete flight.current[sc.schoolCode]; });
+    flight.current[sc.schoolCode] = p; return p;
+  }, [userId, centralApi]);
   const token = useCallback(async (force = false) => {
     if (!school || !userId) throw new ApiError('Pick a school first', 400);
-    const t = tok.current;
-    if (!force && t && t.code === school.schoolCode && t.user === userId && t.exp - Date.now() > 30_000) return t.token;
-    if (inflight.current) return inflight.current;
-    inflight.current = (async () => {
-      const { ticket } = await centralApi('/tickets', { body: { schoolCode: school.schoolCode } });
-      const s = await parse(await fetch(school.baseUrl + '/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket }) }));
-      tok.current = { code: school.schoolCode, token: s.token, exp: new Date(s.expiresAt).getTime(), user: userId };
-      return s.token as string;
-    })().finally(() => { inflight.current = null; });
-    return inflight.current;
-  }, [school, userId, centralApi]);
+    return tokenFor(school, force);
+  }, [school, userId, tokenFor]);
+  const apiFor = useCallback(async (sc: School, path: string, o: Opts = {}) => {
+    const go = async (force: boolean) => fetch(sc.baseUrl + path, { method: o.method ?? (o.body ? 'POST' : 'GET'), headers: { Authorization: 'Bearer ' + (await tokenFor(sc, force)), ...(o.body ? { 'Content-Type': 'application/json' } : {}) }, body: o.body ? JSON.stringify(o.body) : undefined });
+    let r = await go(false); if (r.status === 401) r = await go(true);
+    return parse(r);
+  }, [tokenFor]);
 
   const api = useCallback(async (path: string, o: Opts = {}) => {
     const go = async (force: boolean) => fetch(school!.baseUrl + path, { method: o.method ?? (o.body ? 'POST' : 'GET'), headers: { Authorization: 'Bearer ' + (await token(force)), ...(o.body ? { 'Content-Type': 'application/json' } : {}) }, body: o.body ? JSON.stringify(o.body) : undefined });
@@ -86,7 +96,14 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
   }, [api, school]);
   useEffect(() => { setMe(null); setMeState('idle'); if (isLoaded && isSignedIn && school) refreshMe(); }, [isLoaded, isSignedIn, school, userId]); // eslint-disable-line
 
-  const chooseSchool = useCallback((s: School | null) => { tok.current = null; if (s) localStorage.setItem(KEY, s.schoolCode); else localStorage.removeItem(KEY); setCode(s?.schoolCode ?? null); }, []);
-  const value: Ctx = { central, schools, schoolsError, school, meta, me, meState, meError, flags, chooseSchool, refreshMe, api, centralApi, token: () => token(false), reloadSchools: () => setN(x => x + 1) };
+  const chooseSchool = useCallback((s: School | null) => { if (s) localStorage.setItem(KEY, s.schoolCode); else localStorage.removeItem(KEY); setCode(s?.schoolCode ?? null); }, []);
+  // Fresh browser: if this account has exactly one school on the network, pick it instead of showing the chooser.
+  const autoTried = useRef(false); const [picking, setPicking] = useState(true);
+  useEffect(() => {
+    if (!isLoaded) return; if (!isSignedIn || localStorage.getItem(KEY)) { setPicking(false); return; }
+    if (!schools || autoTried.current) return; autoTried.current = true;
+    centralApi('/me/schools').then((r: any) => { const mine = schools.filter(s => r?.schools?.includes(s._id)); if (mine.length === 1 && !localStorage.getItem(KEY)) chooseSchool(mine[0]); }).catch(() => {}).finally(() => setPicking(false));
+  }, [isLoaded, isSignedIn, schools, centralApi, chooseSchool]);
+  const value: Ctx = { picking, central, schools, schoolsError, school, meta, me, meState, meError, flags, chooseSchool, refreshMe, api, apiFor, centralApi, token: () => token(false), reloadSchools: () => setN(x => x + 1) };
   return <C.Provider value={value}>{children}</C.Provider>;
 }
