@@ -14,16 +14,23 @@ import House from '@mui/icons-material/House';
 import { DAYS, todayISO } from '@/lib/format';
 import type { Home } from '@/lib/types';
 export type CommuteValue = { homeId: string; direction: 'to-school' | 'home'; dates: string[]; days: number[]; startTime: string; endTime: string };
-export function useCommute(homes: Home[] | undefined) {
+/** draftKey: persist the form in localStorage so a refresh keeps it; call clearDraft() after posting. */
+export function useCommute(homes: Home[] | undefined, draftKey?: string) {
   const [v, setV] = useState<CommuteValue>({ homeId: '', direction: 'to-school', dates: [], days: [1, 2, 3, 4, 5], startTime: '07:30', endTime: '08:15' });
   const [mode, setMode] = useState<'weekly' | 'once'>('weekly'); const [date, setDate] = useState(todayISO());
-  useEffect(() => { if (homes?.length && !v.homeId) setV(x => ({ ...x, homeId: homes[0]._id })); }, [homes]); // eslint-disable-line
+  const [loaded, setLoaded] = useState(!draftKey);
+  useEffect(() => { if (!draftKey) return; try { const d = JSON.parse(localStorage.getItem(draftKey) || 'null'); if (d?.v) { setV(d.v); setMode(d.mode === 'once' ? 'once' : 'weekly'); if (typeof d.date === 'string' && d.date >= todayISO()) setDate(d.date); } } catch {} setLoaded(true); }, [draftKey]);
+  useEffect(() => { if (draftKey && loaded) localStorage.setItem(draftKey, JSON.stringify({ v, mode, date })); }, [draftKey, loaded, v, mode, date]);
+  useEffect(() => { if (homes && (!v.homeId || !homes.some(h => h._id === v.homeId)) && homes.length) setV(x => ({ ...x, homeId: homes[0]._id })); }, [homes, loaded]); // eslint-disable-line
+  const clearDraft = () => { if (draftKey) localStorage.removeItem(draftKey); };
   const value: CommuteValue = { ...v, days: mode === 'weekly' ? v.days : [], dates: mode === 'once' ? [date] : [] };
-  const valid = !!v.homeId && (mode === 'once' ? !!date : v.days.length > 0) && v.startTime <= v.endTime;
-  return { v, setV, mode, setMode, date, setDate, value, valid };
+  const pastDate = mode === 'once' && (!date || date < todayISO());
+  const badTime = !(v.startTime < v.endTime);
+  const valid = !!v.homeId && (mode === 'once' ? !pastDate : v.days.length > 0) && !badTime;
+  return { v, setV, mode, setMode, date, setDate, value, valid, pastDate, badTime, clearDraft };
 }
 export default function CommuteForm({ c, homes, timeLabel }: { c: ReturnType<typeof useCommute>; homes: Home[]; timeLabel?: string }) {
-  const { v, setV, mode, setMode, date, setDate } = c;
+  const { v, setV, mode, setMode, date, setDate, pastDate, badTime } = c;
   if (!homes.length) return <Alert severity="info" action={<Button component={Link} href="/homes" color="inherit">Add home</Button>}>Add a home first so we know where you start.</Alert>;
   const lbl = timeLabel ?? (v.direction === 'to-school' ? 'Arrive at school between' : 'Leave school between');
   return (
@@ -41,15 +48,15 @@ export default function CommuteForm({ c, homes, timeLabel }: { c: ReturnType<typ
           <ToggleButtonGroup value={v.days} onChange={(_, d) => setV(x => ({ ...x, days: d }))} aria-label="Weekdays" sx={{ flexWrap: 'wrap', gap: 0.75, '& .MuiToggleButton-root': { border: '1px solid', borderColor: 'divider', borderRadius: '12px !important', flex: '1 0 40px', ml: '0 !important' } }}>
             {DAYS.map((d, i) => <ToggleButton key={d} value={i} aria-label={d}>{d.slice(0, 2)}</ToggleButton>)}
           </ToggleButtonGroup>
-        ) : <TextField type="date" label="Date" value={date} onChange={e => setDate(e.target.value)} slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: todayISO() } }} />}
+        ) : <TextField type="date" label="Date" value={date} onChange={e => setDate(e.target.value)} error={pastDate} helperText={pastDate ? 'Pick today or a later date.' : ' '} slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: todayISO() } }} />}
       </Stack>
       <Stack gap={1}><Typography variant="overline" color="text.secondary">{lbl}</Typography>
         <Stack direction="row" gap={1.5} alignItems="center">
           <TextField type="time" label="From" value={v.startTime} onChange={e => setV(x => ({ ...x, startTime: e.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
           <Typography color="text.secondary">to</Typography>
-          <TextField type="time" label="Until" value={v.endTime} onChange={e => setV(x => ({ ...x, endTime: e.target.value }))} error={v.startTime > v.endTime} slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField type="time" label="Until" value={v.endTime} onChange={e => setV(x => ({ ...x, endTime: e.target.value }))} error={badTime} slotProps={{ inputLabel: { shrink: true } }} />
         </Stack>
-        {v.startTime > v.endTime && <Typography variant="body2" color="error">End time must be after start time.</Typography>}
+        {badTime && <Typography variant="body2" color="error">End time must be after start time.</Typography>}
       </Stack>
     </Stack>
   );
