@@ -19,11 +19,12 @@ export default function Verify() {
   const [email, setEmail] = useState(''); const [sent, setSent] = useState(false); const [code, setCode] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState(''); const [cool, setCool] = useState(0);
   useEffect(() => { if (schools && !school) router.replace('/school'); }, [schools, school, router]);
   useEffect(() => { if (me?.verified) router.replace(me.role ? '/home' : '/role'); }, [me, router]);
+  useEffect(() => { try { const s = JSON.parse(localStorage.getItem('cs-otp') || 'null'); if (s && s.until > Date.now()) { setEmail(s.email); setSent(true); setCool(Math.max(0, Math.ceil((s.sentAt + 60000 - Date.now()) / 1000))); } } catch {} }, []);
   useEffect(() => { if (cool <= 0) return; const t = setTimeout(() => setCool(c => c - 1), 1000); return () => clearTimeout(t); }, [cool]);
   const domains = school?.domains || [];
   const okDomain = domains.some(d => email.toLowerCase().trim().endsWith('@' + d));
-  async function send() { setBusy(true); setErr(''); try { await api('/edu/send', { body: { email: email.trim().toLowerCase() } }); setSent(true); setCool(60); } catch (e) { setErr(errText(e)); } finally { setBusy(false); } }
-  async function verify() { setBusy(true); setErr(''); try { await api('/edu/verify', { body: { code } }); const m = await refreshMe(); router.replace(m?.role ? '/home' : '/role'); } catch (e) { setErr(errText(e)); setBusy(false); } }
+  async function send() { setBusy(true); setErr(''); try { await api('/edu/send', { body: { email: email.trim().toLowerCase() } }); setSent(true); setCool(60); localStorage.setItem('cs-otp', JSON.stringify({ email: email.trim().toLowerCase(), sentAt: Date.now(), until: Date.now() + 600000 })); } catch (e) { setErr(errText(e)); } finally { setBusy(false); } }
+  async function verify() { setBusy(true); setErr(''); try { await api('/edu/verify', { body: { code } }); localStorage.removeItem('cs-otp'); const m = await refreshMe(); router.replace(m?.role ? '/home' : '/role'); } catch (e) { setErr(errText(e)); setBusy(false); } }
   if (!school || meState === 'loading' || meState === 'idle') return <Onboard step={1} title="Verify you're a student"><Loading rows={2} h={56} /></Onboard>;
   return (
     <Onboard step={1} title="Verify you're a student" sub={`We'll email a 6 digit code to your ${school.name} address. Required for everyone.`}>
@@ -44,7 +45,7 @@ export default function Verify() {
           {err && <Alert severity="error">{err}</Alert>}
           <Button type="submit" size="large" variant="contained" disabled={code.length !== 6 || busy}>{busy ? 'Checking…' : 'Verify'}</Button>
           <Typography variant="body2" color="text.secondary" textAlign="center">
-            {cool > 0 ? `Resend in ${cool}s` : <Link component="button" type="button" onClick={send}>Resend code</Link>} · <Link component="button" type="button" onClick={() => { setSent(false); setCode(''); setErr(''); }}>Change email</Link>
+            {cool > 0 ? `Resend in ${cool}s` : <Link component="button" type="button" onClick={send}>Resend code</Link>} · <Link component="button" type="button" onClick={() => { localStorage.removeItem('cs-otp'); setSent(false); setCode(''); setErr(''); }}>Change email</Link>
           </Typography>
         </Stack>
       )}
