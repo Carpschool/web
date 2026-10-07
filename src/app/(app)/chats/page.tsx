@@ -25,7 +25,7 @@ export default function Chats() {
             <Stack direction="row" alignItems="center" gap={2}>
               <Avatar sx={{ bgcolor: 'primary.main', color: 'secondary.main', fontWeight: 700 }}>{shortId(other).slice(0, 2)}</Avatar>
               <Box sx={{ flex: 1, minWidth: 0 }}><Typography fontWeight={700}>{driver ? 'Rider' : 'Driver'} · {shortId(other)}</Typography><Typography variant="body2" color="text.secondary">{timeAgo(n.updatedAt || n.createdAt)}</Typography></Box>
-              <Chip size="small" label={n.status === 'open' ? 'Negotiating' : n.status === 'locked' ? 'Locked' : n.status} color={n.status === 'open' ? 'secondary' : 'success'} />
+              <Chip size="small" label={n.status === 'open' ? 'Negotiating' : n.status === 'locked' ? 'Locked' : 'Cancelled'} color={n.status === 'open' ? 'secondary' : n.status === 'locked' ? 'success' : 'default'} />
             </Stack>
           </Ticket></Link>); })}</Stack>}
   </>);
