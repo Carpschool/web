@@ -22,7 +22,8 @@ export default function Verify() {
   useEffect(() => { try { const s = JSON.parse(localStorage.getItem('cs-otp') || 'null'); if (s && s.until > Date.now()) { setEmail(s.email); setSent(true); setCool(Math.max(0, Math.ceil((s.sentAt + 60000 - Date.now()) / 1000))); } } catch {} }, []);
   useEffect(() => { if (cool <= 0) return; const t = setTimeout(() => setCool(c => c - 1), 1000); return () => clearTimeout(t); }, [cool]);
   const domains = school?.domains || [];
-  const okDomain = domains.some(d => email.toLowerCase().trim().endsWith('@' + d));
+  // domain rules are public hints; regex rules are private, so the server decides
+  const okDomain = !domains.length || domains.some(d => email.toLowerCase().trim().endsWith('@' + d));
   async function send() { setBusy(true); setErr(''); try { await api('/edu/send', { body: { email: email.trim().toLowerCase() } }); setSent(true); setCool(60); localStorage.setItem('cs-otp', JSON.stringify({ email: email.trim().toLowerCase(), sentAt: Date.now(), until: Date.now() + 600000 })); } catch (e) { setErr(errText(e)); } finally { setBusy(false); } }
   async function verify() { setBusy(true); setErr(''); try { await api('/edu/verify', { body: { code } }); localStorage.removeItem('cs-otp'); const m = await refreshMe(); router.replace(m?.role ? '/home' : '/role'); } catch (e) { setErr(errText(e)); setBusy(false); } }
   if (!school || meState === 'loading' || meState === 'idle') return <Onboard step={1} title="Verify you're a student"><Loading rows={2} h={56} /></Onboard>;
@@ -30,12 +31,12 @@ export default function Verify() {
     <Onboard step={1} title="Verify you're a student" sub={`We'll email a 6 digit code to your ${school.name} address. Required for everyone.`}>
       {meState === 'error' && <Alert severity="error" sx={{ mb: 2 }}>{meError}</Alert>}
       {!sent ? (
-        <Stack component="form" gap={2} onSubmit={e => { e.preventDefault(); if (okDomain) send(); }}>
+        <Stack component="form" gap={2} onSubmit={e => { e.preventDefault(); send(); }}>
           <TextField label="School email" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={'you@' + (domains[0] || 'school.edu')}
-            error={!!email && email.includes('@') && !okDomain} helperText={email.includes('@') && !okDomain ? 'Use an address ending in @' + domains.join(' or @') : 'Must end in @' + domains.join(' or @')}
+            error={false} helperText={!domains.length ? 'Your school email' : email.includes('@') && !okDomain ? 'Usually ends in @' + domains.join(' or @') + '. We\'ll check when you send.' : 'Usually ends in @' + domains.join(' or @')}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><MailOutline /></InputAdornment> } }} />
           {err && <Alert severity="error">{err}</Alert>}
-          <Button type="submit" size="large" variant="contained" disabled={!okDomain || busy}>{busy ? 'Sending…' : 'Send code'}</Button>
+          <Button type="submit" size="large" variant="contained" disabled={!email.includes('@') || busy}>{busy ? 'Sending…' : 'Send code'}</Button>
         </Stack>
       ) : (
         <Stack component="form" gap={2} onSubmit={e => { e.preventDefault(); if (code.length === 6) verify(); }}>
