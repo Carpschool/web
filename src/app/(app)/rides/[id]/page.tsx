@@ -1,4 +1,5 @@
 'use client';
+import { useRouter } from 'next/navigation';
 import { use, useState } from 'react';
 import Link from 'next/link';
 import Box from '@mui/material/Box';
@@ -33,6 +34,7 @@ function here(fallback: Point): Promise<{ loc: Point; approx: boolean }> {
 }
 const label: Record<string, [string, any]> = { locked: ['Waiting at pickup', 'secondary'], boarded: ['On board', 'success'], completed: ['Dropped off', 'default'], dropped: ['Dropped off', 'default'], left: ['Left', 'default'] };
 export default function Ride({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter();
   const { id } = use(params); const { me, api } = useSchool(); const toast = useToast(); const driver = me?.role === 'driver';
   const q = useApi<Drive>('/carpools/' + id, { refetchInterval: 20000 });
   const [pin, setPin] = useState<string | null>(null); const [pinBusy, setPinBusy] = useState(false);
@@ -99,6 +101,6 @@ export default function Ride({ params }: { params: Promise<{ id: string }> }) {
     <Confirm open={!!drop} title="Complete drop-off?" body="We'll save one location snapshot and mark the ride done." confirmText="Complete" onClose={() => setDrop(null)}
       onConfirm={async () => { try { const { loc } = await here(drop!.pickup); await api('/carpools/' + id + '/dropoff', { body: { rider: drop!.rider, location: loc } }); toast('Drop-off complete'); q.refetch(); } catch (e) { toast(errText(e), 'error'); } setDrop(null); }} />
     <Confirm open={!!leave} title={driver ? 'Remove this rider?' : 'Leave this carpool?'} body={driver ? 'Their seat opens up and they get an email.' : 'Your seat is released and the driver gets an email. Your request goes back into the pool.'} confirmText={driver ? 'Remove' : 'Leave'} danger onClose={() => setLeave(null)}
-      onConfirm={async () => { try { await api('/carpools/' + id + '/leave', { body: { rider: leave!.rider } }); toast(driver ? 'Rider removed' : 'You left the carpool'); q.refetch(); } catch (e) { toast(errText(e), 'error'); } setLeave(null); }} />
+      onConfirm={async () => { try { await api('/carpools/' + id + '/leave', { body: { rider: leave!.rider } }); toast(driver ? 'Rider removed' : 'You left the carpool'); if (driver) q.refetch(); else router.replace('/rides'); } catch (e) { toast(errText(e), 'error'); } setLeave(null); }} />
   </>);
 }

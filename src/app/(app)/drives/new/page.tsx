@@ -17,7 +17,7 @@ import { useToast } from '@/components/Toast';
 import type { Home } from '@/lib/types';
 import { errText } from '@/lib/format';
 export default function NewDrive() {
-  const homes = useApi<Home[]>('/homes'); const c = useCommute(homes.data); const { api, meta } = useSchool(); const router = useRouter(); const toast = useToast();
+  const homes = useApi<Home[]>('/homes'); const c = useCommute(homes.data, 'carpschool.draft.drive'); const { api, meta } = useSchool(); const router = useRouter(); const toast = useToast();
   const [seats, setSeats] = useState(3); const [route, setRoute] = useState<{ coordinates: [number, number][]; meters: number; seconds: number } | null>(null); const [rErr, setRErr] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
   const home = homes.data?.find(h => h._id === c.v.homeId); const maxSeats = Math.min(meta?.limits.seats ?? 4, 4);
   useEffect(() => {
@@ -26,7 +26,7 @@ export default function NewDrive() {
     const [from, to] = c.v.direction === 'to-school' ? [h, s] : [s, h];
     fetch(`/api/route?from=${from}&to=${to}`).then(r => r.json()).then(j => j.coordinates ? setRoute(j) : setRErr(j.error || 'Could not get a route')).catch(() => setRErr('Could not get a route'));
   }, [home?._id, c.v.direction, meta]); // eslint-disable-line
-  async function submit() { setBusy(true); setErr(''); try { const d = await api('/drives', { body: { commute: c.value, route: route!.coordinates, seats } }); toast('Drive posted'); router.push('/drives/' + d._id); } catch (e) { setErr(errText(e)); setBusy(false); } }
+  async function submit() { setBusy(true); setErr(''); try { const d = await api('/drives', { body: { commute: c.value, route: route!.coordinates, seats } }); c.clearDraft(); toast('Drive posted'); router.push('/drives/' + d._id); } catch (e) { setErr(errText(e)); setBusy(false); } }
   const line = route?.coordinates.map(([a, b]) => [b, a] as [number, number]);
   return (<>
     <PageHead kicker="Driver" title="Post a drive" sub="We'll find riders who live a short walk from your route." />

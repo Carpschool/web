@@ -20,7 +20,7 @@ export default function Rides() {
   const pools = (q.data || []).filter(d => d.passengers.length > 0);
   const isUpcoming = (d: Drive) => d.status === 'active' && d.passengers.some(p => p.status === 'locked' || p.status === 'boarded');
   const list = pools.filter(d => tab === 0 ? isUpcoming(d) : !isUpcoming(d));
-  const status = (d: Drive) => { const ps = d.passengers; if (d.status === 'cancelled') return ['Cancelled', 'default']; if (ps.every(p => p.status === 'completed' || p.status === 'dropped')) return ['Completed', 'success']; if (ps.every(p => p.status === 'left')) return [driver ? 'Riders left' : 'Left', 'default']; if (ps.some(p => p.status === 'boarded')) return ['On board', 'secondary']; return ['Locked', 'success']; };
+  const status = (d: Drive) => { const ps = d.passengers; if (ps.every(p => p.status === 'completed' || p.status === 'dropped')) return ['Completed', 'success']; if (d.status === 'cancelled') return ['Cancelled', 'default']; if (ps.every(p => p.status === 'left')) return [driver ? 'Riders left' : 'Left', 'default']; if (ps.some(p => p.status === 'boarded')) return ['On board', 'secondary']; return ['Locked', 'success']; };
   return (<>
     <PageHead kicker="Carpools" title="Rides" />
     <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2.5 }} textColor="primary" indicatorColor="secondary"><Tab label="Upcoming" /><Tab label="History" /></Tabs>

@@ -1,4 +1,5 @@
 'use client';
+import { errText } from '@/lib/format';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
@@ -7,7 +8,7 @@ import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 export function Loading({ rows = 3, h = 88 }: { rows?: number; h?: number }) { return <Stack gap={1.5} aria-busy="true" aria-label="Loading">{Array.from({ length: rows }, (_, i) => <Skeleton key={i} variant="rounded" height={h} sx={{ borderRadius: '20px' }} />)}</Stack>; }
 export function ErrorState({ error, retry }: { error: unknown; retry?: () => void }) {
-  return <Alert severity="error" action={retry && <Button color="inherit" size="small" onClick={retry}>Retry</Button>}>{error instanceof Error ? error.message : String(error)}</Alert>;
+  return <Alert severity="error" action={retry && <Button color="inherit" size="small" onClick={retry}>Retry</Button>}>{errText(error)}</Alert>;
 }
 export function Empty({ icon, title, body, action }: { icon: React.ReactNode; title: string; body?: string; action?: React.ReactNode }) {
   return (
