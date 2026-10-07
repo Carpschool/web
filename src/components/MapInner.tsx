@@ -1,4 +1,6 @@
 'use client';
+import SchoolRounded from '@mui/icons-material/SchoolRounded';
+import HomeRounded from '@mui/icons-material/HomeRounded';
 import Map, { Marker, Popup, Source, Layer, NavigationControl, type MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { setWorkerUrl } from 'maplibre-gl';
@@ -41,7 +43,9 @@ export default function MapInner(p: MapProps) {
           <Layer id="route-line" type="line" layout={{ 'line-cap': 'round', 'line-join': 'round' }} paint={{ 'line-color': '#13203B', 'line-width': 5 }} />
         </Source>}
         {p.markers?.map((m, i) => <Marker key={m.key ?? i} longitude={m.pos[1]} latitude={m.pos[0]} onClick={e => { e.originalEvent.stopPropagation(); m.onClick?.(); if (m.label) setOpen(i); }}>
-          <div className="pin-dot" title={m.label} style={{ background: m.color || '#13203B', cursor: m.onClick || m.label ? 'pointer' : undefined }} /></Marker>)}
+          {m.icon ? <div title={m.label} aria-label={m.label} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 4px', borderRadius: 999, background: m.color || '#13203B', color: '#fff', font: '600 12px/1 inherit', boxShadow: '0 2px 6px rgba(19,32,59,.35)', border: '2px solid #fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            {m.icon === 'school' ? <SchoolRounded sx={{ fontSize: 16 }} /> : <HomeRounded sx={{ fontSize: 16 }} />}{m.label}</div>
+            : <div className="pin-dot" title={m.label} style={{ background: m.color || '#13203B', cursor: m.onClick || m.label ? 'pointer' : undefined }} />}</Marker>)}
         {open != null && p.markers?.[open]?.label && <Popup longitude={p.markers[open].pos[1]} latitude={p.markers[open].pos[0]} offset={12} closeButton={false} onClose={() => setOpen(null)}>{p.markers[open].label}</Popup>}
       </Map>
     </div>

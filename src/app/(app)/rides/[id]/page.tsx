@@ -79,7 +79,7 @@ export default function Ride({ params }: { params: Promise<{ id: string }> }) {
       </Box>); }) : (<>
       {ps.length > 0 && <Card sx={{ mb: 3, overflow: 'hidden' }}><MapView center={[ps[0].pickup.coordinates[1], ps[0].pickup.coordinates[0]]} fit height={240} line={route.length > 1 ? route : undefined} markers={[
           ...ps.filter(p => p.status !== 'left').map((p, i) => ({ pos: [p.pickup.coordinates[1], p.pickup.coordinates[0]] as [number, number], color: p.status === 'locked' ? '#F2A900' : '#2F7A57', label: `${i + 1}. ${p.time}` })),
-          ...(route.length > 1 ? [{ pos: route[route.length - 1], color: '#C4462B', label: d.direction === 'to-school' ? 'School' : 'Home' }] : [])]} label={route.length > 1 ? 'Route and pickups in order' : 'Pickups in order'} /></Card>}
+          ...(route.length > 1 ? [{ pos: route[route.length - 1], color: '#C4462B', label: d.direction === 'to-school' ? 'School' : 'Home', icon: (d.direction === 'to-school' ? 'school' : 'home') as 'school' | 'home' }] : [])]} label={route.length > 1 ? 'Route and pickups in order' : 'Pickups in order'} /></Card>}
       <Typography variant="h6" component="h2" sx={{ mb: 1.5 }}>Pickups in order</Typography>
       <Stack gap={1.5}>{ps.map((p, i) => { const [l, c] = label[p.status] ?? [p.status, 'default']; return (
         <Card key={p._id} sx={{ p: 2 }} className="rise"><Stack direction="row" alignItems="center" gap={2}>
