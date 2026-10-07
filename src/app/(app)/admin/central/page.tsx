@@ -89,7 +89,7 @@ function Admins({ schools }: { schools: S[] }) {
   async function put(key: string, path: string, admin: boolean, ok: string) { setPending(key); try { await centralApi(path, { method: 'PUT', body: { admin } }); toast(ok); await u.refetch(); } catch (e) { toast(errText(e), 'error'); } setPending(null); }
   return (<>
     <Typography variant="h6" component="h2">Admins</Typography>
-    <Typography color="text.secondary" variant="body2" sx={{ mb: 1.5 }}>Network admins manage every school. School admins manage one school. Changes apply on the user's next session.</Typography>
+    <Typography color="text.secondary" variant="body2" sx={{ mb: 1.5 }}>Assign school admins here. Network admin can only be changed in the Clerk dashboard. Changes apply on the user's next session.</Typography>
     <TextField placeholder="Search by name or email" value={term} onChange={e => setTerm(e.target.value)} sx={{ mb: 1.5 }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search /></InputAdornment> }, htmlInput: { 'aria-label': 'Search users' } }} />
     {u.isLoading ? <Loading rows={3} h={72} /> : u.error ? <ErrorState error={u.error} retry={u.refetch} /> : !u.data?.length ? <Empty icon={<span>🔎</span>} title="No users found" /> :
       <Stack gap={1}>{u.data.map(x => { const self = x.id === user?.id; return <Card key={x.id} sx={{ p: 1.75 }}>
@@ -101,7 +101,7 @@ function Admins({ schools }: { schools: S[] }) {
           <Stack direction="row" gap={0.75} flexWrap="wrap" alignItems="center">
             {schools.map(s => { const on = x.school?.[s._id]?.admin === true; const k = x.id + s._id; return <Chip key={s._id} size="small" disabled={pending === k} clickable color={on ? 'secondary' : 'default'} variant={on ? 'filled' : 'outlined'}
               label={(on ? '✓ ' : '+ ') + s.name + ' admin'} aria-pressed={on} onClick={() => put(k, '/admin/users/' + x.id + '/schools/' + s._id + '/admin', !on, on ? 'Removed ' + s.name + ' admin' : 'Made ' + s.name + ' admin')} />; })}
-            <Tooltip title={self ? "You can't remove your own network admin" : ''}><span><FormControlLabel sx={{ ml: 0.5, mr: 0 }} control={<Switch size="small" checked={x.admin} disabled={(self && x.admin) || pending === x.id} onChange={e => put(x.id, '/admin/users/' + x.id + '/admin', e.target.checked, e.target.checked ? 'Network admin granted' : 'Network admin removed')} />} label="Network admin" /></span></Tooltip>
+            {x.admin && <Tooltip title="Network admin is managed in the Clerk dashboard"><Chip size="small" color="primary" label="Network admin" /></Tooltip>}
           </Stack>
         </Stack></Card>; })}</Stack>}
   </>);
