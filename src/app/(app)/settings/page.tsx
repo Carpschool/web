@@ -49,7 +49,7 @@ export default function Settings() {
       <ListItemButton component={Link} href="/homes"><ListItemIcon><HouseOutlined /></ListItemIcon><ListItemText primary="Homes" secondary="Pickup locations and walking distance" /><ChevronRight /></ListItemButton>
       <Divider component="li" />
       <ListItemButton onClick={() => clerk.openUserProfile()}><ListItemIcon><ManageAccountsOutlined /></ListItemIcon><ListItemText primary="Manage account" secondary="Photo, email, sign-in methods" /><ChevronRight /></ListItemButton>
-      {flags?.schoolAdminOf.includes(school?._id || '-') && <><Divider component="li" /><ListItemButton component={Link} href="/admin/school"><ListItemIcon><AdminPanelSettingsOutlined /></ListItemIcon><ListItemText primary="School admin" /><ChevronRight /></ListItemButton></>}
+      {!!flags?.schoolAdminOf.length && <><Divider component="li" /><ListItemButton component={Link} href="/admin/school"><ListItemIcon><AdminPanelSettingsOutlined /></ListItemIcon><ListItemText primary="School admin" /><ChevronRight /></ListItemButton></>}
       {flags?.admin && <><Divider component="li" /><ListItemButton component={Link} href="/admin/central"><ListItemIcon><HubOutlined /></ListItemIcon><ListItemText primary="Network admin" /><ChevronRight /></ListItemButton></>}
       <Divider component="li" />
       <ListItemButton onClick={() => { chooseSchool(null); router.push('/school'); }}><ListItemIcon><SwapHoriz /></ListItemIcon><ListItemText primary="Switch school" /><ChevronRight /></ListItemButton>

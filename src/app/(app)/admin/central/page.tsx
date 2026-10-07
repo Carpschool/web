@@ -1,5 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import Divider from '@mui/material/Divider';
+import List from '@mui/material/List';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemAvatar from '@mui/material/ListItemAvatar';
+import ListItemText from '@mui/material/ListItemText';
 import { useQuery } from '@tanstack/react-query';
 import { useUser } from '@clerk/nextjs';
 import Card from '@mui/material/Card';
@@ -19,7 +26,6 @@ import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
-import Autocomplete from '@mui/material/Autocomplete';
 import InputAdornment from '@mui/material/InputAdornment';
 import EditOutlined from '@mui/icons-material/EditOutlined';
 import Search from '@mui/icons-material/Search';
@@ -27,86 +33,86 @@ import { Empty, ErrorState, Loading, PageHead } from '@/components/States';
 import { useSchool, ApiError } from '@/lib/school';
 import { useToast } from '@/components/Toast';
 import { errText, timeAgo } from '@/lib/format';
-type S = { _id: string; schoolCode: string; name: string; domains: string[]; baseUrl: string; trusted: boolean; lastHeartbeat?: string };
+type S = { _id: string; schoolCode: string; name: string; domains: string[]; baseUrl: string; trusted: boolean; enabled?: boolean; lastHeartbeat?: string };
 type U = { id: string; name: string | null; email: string | null; imageUrl: string | null; admin: boolean; school: Record<string, { admin: boolean }> };
-const DOMAIN = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 const alive = (h?: string) => !!h && Date.now() - new Date(h).getTime() < 15 * 60_000;
+const CODE = /^[0-9a-f]{7}$/i, SCODE = /^[a-z0-9_-]{2,64}$/, ORIGIN = /^https:\/\/[^/\s]+\/?$/;
 export default function CentralAdmin() {
   const { centralApi, central, flags, reloadSchools } = useSchool(); const toast = useToast();
   const q = useQuery<S[]>({ queryKey: ['central-admin', central], queryFn: () => centralApi('/admin/schools'), enabled: !!central });
-  const [edit, setEdit] = useState<S | null>(null);
+  const [tab, setTab] = useState(0); const [edit, setEdit] = useState<S | null>(null); const [who, setWho] = useState<string | null>(null);
   if (flags && !flags.admin) return <><PageHead title="Network admin" /><Alert severity="warning">This page is for Carpschool network admins.</Alert></>;
   if (q.error instanceof ApiError && q.error.status === 403) return <><PageHead title="Network admin" /><Alert severity="warning">Network admin required.</Alert></>;
   const changed = () => { q.refetch(); reloadSchools?.(); };
-  async function trust(s: S, trusted: boolean) { try { await centralApi('/admin/schools/' + s.schoolCode + '/trust', { method: 'PATCH', body: { trusted } }); toast(trusted ? s.name + ' trusted' : s.name + ' untrusted'); changed(); } catch (e) { toast(errText(e), 'error'); } }
+  async function enable(s: S, enabled: boolean) { try { await centralApi('/admin/schools/' + s.schoolCode + '/enabled', { method: 'PATCH', body: { enabled } }); toast(s.name + (enabled ? ' enabled' : ' disabled')); changed(); } catch (e) { toast(errText(e), 'error'); } }
   return (<>
     <PageHead kicker="Carpschool network" title="Network admin" />
-    <AddSchool onDone={changed} />
-    <CentralSettings />
-    <Typography variant="h6" component="h2" sx={{ mb: 1.5 }}>Schools</Typography>
-    {q.isLoading ? <Loading rows={2} h={80} /> : q.error ? <ErrorState error={q.error} retry={q.refetch} /> : !q.data?.length ? <Empty icon={<span>🏫</span>} title="No schools yet" body="Onboard a school server above." /> :
-      <Stack gap={1.5} sx={{ mb: 4 }}>{q.data.map(s => <Card key={s._id} sx={{ p: 2, opacity: s.trusted ? 1 : 0.8 }}><Stack direction="row" alignItems="center" gap={1.5} flexWrap="wrap">
+    <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" sx={{ mb: 2 }} indicatorColor="secondary"><Tab label="Schools" /><Tab label="Users" /><Tab label="Add school" /><Tab label="Settings" /></Tabs>
+    {tab === 0 && (q.isLoading ? <Loading rows={2} h={80} /> : q.error ? <ErrorState error={q.error} retry={q.refetch} /> : !q.data?.length ? <Empty icon={<span>🏫</span>} title="No schools yet" body="Add a school server from the Add school tab." /> :
+      <Stack gap={1.5}>{q.data.map(s => { const on = s.enabled !== false; return <Card key={s._id} sx={{ p: 2, opacity: on ? 1 : 0.75 }}><Stack direction="row" alignItems="center" gap={1.5} flexWrap="wrap">
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap"><Typography fontWeight={700}>{s.name}</Typography><Typography component="span" color="text.secondary" sx={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{s.schoolCode}</Typography>
-            <Chip size="small" variant="outlined" label={alive(s.lastHeartbeat) ? 'Online' : 'Offline'} color={alive(s.lastHeartbeat) ? 'success' : 'default'} />{!s.trusted && <Chip size="small" color="warning" label="Untrusted" />}</Stack>
+            <Chip size="small" variant="outlined" label={alive(s.lastHeartbeat) ? 'Online' : 'Offline'} color={alive(s.lastHeartbeat) ? 'success' : 'default'} />{!on && <Chip size="small" color="warning" label="Disabled" />}</Stack>
           <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-all' }}>{s.baseUrl}</Typography>
           <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 0.75 }}>{s.domains.map(d => <Chip key={d} size="small" label={'@' + d} />)}</Stack>
           <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 0.5 }}>ID {s._id} · heartbeat {s.lastHeartbeat ? timeAgo(s.lastHeartbeat) : 'never'}</Typography></Box>
         <Stack direction="row" alignItems="center" gap={0.5}>
-          <FormControlLabel control={<Switch checked={!!s.trusted} onChange={e => trust(s, e.target.checked)} />} label="Trusted" />
-          <Tooltip title="Edit school"><IconButton aria-label={'Edit ' + s.name} onClick={() => setEdit(s)}><EditOutlined /></IconButton></Tooltip></Stack>
-      </Stack></Card>)}</Stack>}
-    <Admins schools={q.data || []} />
-    {edit && <EditSchool s={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); changed(); }} />}
+          <FormControlLabel control={<Switch checked={on} onChange={e => enable(s, e.target.checked)} />} label="Enabled" />
+          <Tooltip title="School admins"><IconButton aria-label={'Manage admins of ' + s.name} onClick={() => setEdit(s)}><EditOutlined /></IconButton></Tooltip></Stack>
+      </Stack></Card>; })}</Stack>)}
+    {tab === 1 && <Users onOpen={setWho} />}
+    {tab === 2 && <AddSchool onDone={() => { changed(); setTab(0); }} />}
+    {tab === 3 && <CentralSettings />}
+    {edit && <SchoolAdmins s={edit} onClose={() => setEdit(null)} onOpen={setWho} />}
+    {who && <UserDialog id={who} onClose={() => setWho(null)} />}
   </>);
 }
-function EditSchool({ s, onClose, onSaved }: { s: S; onClose: () => void; onSaved: () => void }) {
+function SchoolAdmins({ s, onClose, onOpen }: { s: S; onClose: () => void; onOpen: (id: string) => void }) {
   const { centralApi } = useSchool(); const toast = useToast();
-  const [f, setF] = useState({ name: s.name, domains: s.domains, baseUrl: s.baseUrl }); const [busy, setBusy] = useState(false);
-  const errs = { name: f.name.trim().length < 2, domains: !f.domains.length || f.domains.some(d => !DOMAIN.test(d)), baseUrl: !/^https:\/\/[^/\s]+\/?$/.test(f.baseUrl.trim()) };
-  async function save() {
-    const b: any = {}; if (f.name.trim() !== s.name) b.name = f.name.trim(); if (JSON.stringify(f.domains) !== JSON.stringify(s.domains)) b.domains = f.domains; if (f.baseUrl.trim().replace(/\/$/, '') !== s.baseUrl) b.baseUrl = f.baseUrl.trim().replace(/\/$/, '');
-    if (!Object.keys(b).length) return onClose();
-    setBusy(true); try { await centralApi('/admin/schools/' + s.schoolCode, { method: 'PATCH', body: b }); toast('School updated'); onSaved(); } catch (e) { toast(errText(e), 'error'); setBusy(false); }
-  }
-  return <Dialog open onClose={onClose} fullWidth maxWidth="sm"><DialogTitle>Edit {s.name}</DialogTitle>
-    <DialogContent><Stack gap={2} sx={{ pt: 1 }}>
-      <TextField label="Name" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} error={errs.name} helperText={errs.name ? 'At least 2 characters' : ' '} />
-      <Autocomplete multiple freeSolo options={[] as string[]} value={f.domains} onChange={(_, v) => setF({ ...f, domains: [...new Set((v as string[]).map(d => d.trim().toLowerCase().replace(/^@/, '')).filter(Boolean))] })}
-        renderValue={(v, gp) => v.map((d, i) => { const { key, ...p } = gp({ index: i }); return <Chip key={key} {...p} size="small" label={'@' + d} color={DOMAIN.test(d) ? 'default' : 'error'} />; })}
-        renderInput={p => <TextField {...p} label="Email domains" placeholder="school.edu" error={errs.domains} helperText={errs.domains ? 'At least one valid domain' : 'Press Enter after each'} />} />
-      <TextField label="Server URL" value={f.baseUrl} onChange={e => setF({ ...f, baseUrl: e.target.value })} error={errs.baseUrl} helperText={errs.baseUrl ? 'HTTPS origin, no path' : 'Must serve the same school code and signing key; we re-verify it.'} />
-    </Stack></DialogContent>
-    <DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" disabled={busy || Object.values(errs).some(Boolean)} onClick={save}>{busy ? 'Saving…' : 'Save'}</Button></DialogActions></Dialog>;
+  const u = useQuery<(U & { schoolAdmin: boolean })[]>({ queryKey: ['school-users', s.schoolCode], queryFn: () => centralApi('/admin/schools/' + s.schoolCode + '/users') });
+  const [pending, setPending] = useState<string | null>(null);
+  async function set(x: U, admin: boolean) { setPending(x.id); try { await centralApi('/admin/users/' + x.id + '/schools/' + s._id + '/admin', { method: 'PUT', body: { admin } }); toast((x.name || 'User') + (admin ? ' is now a school admin' : ' is no longer a school admin')); await u.refetch(); } catch (e) { toast(errText(e), 'error'); } setPending(null); }
+  return <Dialog open onClose={onClose} fullWidth maxWidth="sm" scroll="paper"><DialogTitle>{s.name}<Typography variant="body2" color="text.secondary">School settings are managed by its school admins. Choose who they are; it applies on their next session.</Typography></DialogTitle>
+    <DialogContent dividers sx={{ p: 0 }}>{u.isLoading ? <Box sx={{ p: 2 }}><Loading rows={3} h={48} /></Box> : u.error ? <Box sx={{ p: 2 }}><ErrorState error={u.error} retry={u.refetch} /></Box> : !u.data?.length ? <Box sx={{ p: 2 }}><Empty icon={<span>👥</span>} title="No users yet" body="People show up here after they open this school in Carpschool." /></Box> :
+      <List dense>{u.data.map(x => <Stack key={x.id} direction="row" alignItems="center" sx={{ pr: 2 }}>
+        <ListItemButton onClick={() => onOpen(x.id)} sx={{ flex: 1, minWidth: 0 }}><ListItemAvatar><Avatar src={x.imageUrl || undefined} alt="">{(x.name || x.email || '?')[0]}</Avatar></ListItemAvatar><ListItemText primary={x.name || 'Unnamed'} secondary={x.email || x.id} slotProps={{ primary: { noWrap: true }, secondary: { noWrap: true } }} /></ListItemButton>
+        <FormControlLabel labelPlacement="start" control={<Switch checked={x.schoolAdmin} disabled={pending === x.id} onChange={e => set(x, e.target.checked)} />} label="Admin" /></Stack>)}</List>}</DialogContent>
+    <DialogActions><Button onClick={onClose}>Done</Button></DialogActions></Dialog>;
 }
-function Admins({ schools }: { schools: S[] }) {
-  const { centralApi } = useSchool(); const toast = useToast(); const { user } = useUser();
+function Users({ onOpen }: { onOpen: (id: string) => void }) {
+  const { centralApi } = useSchool(); const { user } = useUser();
   const [term, setTerm] = useState(''); const [query, setQuery] = useState('');
   useEffect(() => { const t = setTimeout(() => setQuery(term.trim()), 350); return () => clearTimeout(t); }, [term]);
   const u = useQuery<U[]>({ queryKey: ['central-users', query], queryFn: () => centralApi('/admin/users' + (query ? '?q=' + encodeURIComponent(query) : '')) });
-  const [pending, setPending] = useState<string | null>(null);
-  async function put(key: string, path: string, admin: boolean, ok: string) { setPending(key); try { await centralApi(path, { method: 'PUT', body: { admin } }); toast(ok); await u.refetch(); } catch (e) { toast(errText(e), 'error'); } setPending(null); }
   return (<>
-    <Typography variant="h6" component="h2">Admins</Typography>
-    <Typography color="text.secondary" variant="body2" sx={{ mb: 1.5 }}>Assign school admins here. Network admin can only be changed in the Clerk dashboard. Changes apply on the user's next session.</Typography>
     <TextField placeholder="Search by name or email" value={term} onChange={e => setTerm(e.target.value)} sx={{ mb: 1.5 }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search /></InputAdornment> }, htmlInput: { 'aria-label': 'Search users' } }} />
-    {u.isLoading ? <Loading rows={3} h={72} /> : u.error ? <ErrorState error={u.error} retry={u.refetch} /> : !u.data?.length ? <Empty icon={<span>🔎</span>} title="No users found" /> :
-      <Stack gap={1}>{u.data.map(x => { const self = x.id === user?.id; return <Card key={x.id} sx={{ p: 1.75 }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5} alignItems={{ sm: 'center' }}>
-          <Stack direction="row" gap={1.5} alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
-            <Avatar src={x.imageUrl || undefined} alt="" sx={{ width: 40, height: 40 }}>{(x.name || x.email || '?')[0]}</Avatar>
-            <Box sx={{ minWidth: 0 }}><Typography fontWeight={700} noWrap>{x.name || 'Unnamed'}{self && <Typography component="span" color="text.secondary" fontWeight={400}> (you)</Typography>}</Typography><Typography variant="body2" color="text.secondary" noWrap>{x.email || x.id}</Typography></Box>
-          </Stack>
-          <Stack direction="row" gap={0.75} flexWrap="wrap" alignItems="center">
-            {schools.map(s => { const on = x.school?.[s._id]?.admin === true; const k = x.id + s._id; return <Chip key={s._id} size="small" disabled={pending === k} clickable color={on ? 'secondary' : 'default'} variant={on ? 'filled' : 'outlined'}
-              label={(on ? '✓ ' : '+ ') + s.name + ' admin'} aria-pressed={on} onClick={() => put(k, '/admin/users/' + x.id + '/schools/' + s._id + '/admin', !on, on ? 'Removed ' + s.name + ' admin' : 'Made ' + s.name + ' admin')} />; })}
-            {x.admin && <Tooltip title="Network admin is managed in the Clerk dashboard"><Chip size="small" color="primary" label="Network admin" /></Tooltip>}
-          </Stack>
-        </Stack></Card>; })}</Stack>}
+    {u.isLoading ? <Loading rows={3} h={64} /> : u.error ? <ErrorState error={u.error} retry={u.refetch} /> : !u.data?.length ? <Empty icon={<span>🔎</span>} title="No users found" /> :
+      <Card><List disablePadding>{u.data.map((x, i) => <Box key={x.id}>{i > 0 && <Divider component="div" />}<ListItemButton onClick={() => onOpen(x.id)}>
+        <ListItemAvatar><Avatar src={x.imageUrl || undefined} alt="">{(x.name || x.email || '?')[0]}</Avatar></ListItemAvatar>
+        <ListItemText primary={<>{x.name || 'Unnamed'}{x.id === user?.id && <Typography component="span" color="text.secondary"> (you)</Typography>}</>} secondary={x.email || x.id} slotProps={{ secondary: { noWrap: true } }} sx={{ minWidth: 0 }} />
+        {x.admin && <Tooltip title="Managed in the Clerk dashboard"><Chip size="small" color="primary" label="Network admin" sx={{ ml: 1 }} /></Tooltip>}
+      </ListItemButton></Box>)}</List></Card>}
   </>);
 }
-
-const CODE = /^[0-9a-f]{7}$/i, SCODE = /^[a-z0-9_-]{2,64}$/, ORIGIN = /^https:\/\/[^/\s]+\/?$/;
+type Detail = U & { firstSeen: string | null; lastSeen: string | null; schools: { _id: string; schoolCode: string; name: string; enabled?: boolean; used: boolean; schoolAdmin: boolean }[] };
+function UserDialog({ id, onClose }: { id: string; onClose: () => void }) {
+  const { centralApi } = useSchool();
+  const d = useQuery<Detail>({ queryKey: ['central-user', id], queryFn: () => centralApi('/admin/users/' + id) });
+  const x = d.data;
+  return <Dialog open onClose={onClose} fullWidth maxWidth="sm" scroll="paper"><DialogTitle>{x?.name || 'User'}</DialogTitle>
+    <DialogContent dividers>{d.isLoading ? <Loading rows={3} h={40} /> : d.error ? <ErrorState error={d.error} retry={d.refetch} /> : x && <Stack gap={2}>
+      <Stack direction="row" gap={1.5} alignItems="center"><Avatar src={x.imageUrl || undefined} alt="" sx={{ width: 48, height: 48 }}>{(x.name || '?')[0]}</Avatar>
+        <Box sx={{ minWidth: 0 }}><Typography sx={{ wordBreak: 'break-all' }}>{x.email || '—'}</Typography><Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'var(--font-mono)' }}>{x.id}</Typography></Box></Stack>
+      <Stack direction="row" gap={0.75} flexWrap="wrap">{x.admin && <Chip size="small" color="primary" label="Network admin" />}<Chip size="small" variant="outlined" label={'First seen ' + (x.firstSeen ? timeAgo(x.firstSeen) : 'never')} /><Chip size="small" variant="outlined" label={'Last active ' + (x.lastSeen ? timeAgo(x.lastSeen) : 'never')} /></Stack>
+      <Divider />
+      <Typography fontWeight={700} component="h3">Schools</Typography>
+      {!x.schools.length ? <Typography variant="body2" color="text.secondary">Hasn't opened a school yet.</Typography> : x.schools.map(s => <Stack key={s._id} direction="row" gap={1} alignItems="center" flexWrap="wrap">
+        <Typography>{s.name}</Typography><Typography color="text.secondary" sx={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{s.schoolCode}</Typography>
+        {s.used && <Chip size="small" label="Member" />}{s.schoolAdmin && <Chip size="small" color="secondary" label="School admin" />}{s.enabled === false && <Chip size="small" color="warning" label="Disabled" />}</Stack>)}
+      <Typography variant="caption" color="text.secondary">Ride data, homes and reports live on each school's server; its school admins can see them.</Typography>
+    </Stack>}</DialogContent>
+    <DialogActions><Button onClick={onClose}>Close</Button></DialogActions></Dialog>;
+}
 function AddSchool({ onDone }: { onDone: () => void }) {
   const { centralApi } = useSchool(); const toast = useToast();
   const [f, setF] = useState({ baseUrl: '', code: '', schoolCode: '', name: '' }); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');

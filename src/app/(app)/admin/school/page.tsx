@@ -1,5 +1,11 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Avatar from '@mui/material/Avatar';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Card from '@mui/material/Card';
@@ -23,22 +29,34 @@ import InputAdornment from '@mui/material/InputAdornment';
 import Autocomplete from '@mui/material/Autocomplete';
 import PlaceSearch from '@/components/PlaceSearch';
 import { Empty, ErrorState, Loading, PageHead } from '@/components/States';
-import { useApi } from '@/lib/hooks';
 import { useSchool } from '@/lib/school';
 import { useToast } from '@/components/Toast';
 import { ApiError } from '@/lib/school';
 import { errText, shortId, timeAgo } from '@/lib/format';
+const PICK = 'carpschool.adminSchool';
 export default function SchoolAdmin() {
-  const { api, school } = useSchool(); const toast = useToast(); const [tab, setTab] = useState(0);
-  const users = useApi<any[]>('/admin/users'); const reports = useApi<any[]>(tab === 1 ? '/admin/reports' : null); const settings = useApi<Settings>(tab >= 2 ? '/admin/settings' : null);
-  if (users.error instanceof ApiError && users.error.status === 403) return <><PageHead title="School admin" /><Alert severity="warning">You're not an admin for {school?.name}.</Alert></>;
+  const { apiFor, school: active, schools, flags } = useSchool(); const toast = useToast(); const [tab, setTab] = useState(0);
+  const mine = useMemo(() => (schools || []).filter(s => flags?.schoolAdminOf.includes(s._id)), [schools, flags]);
+  const [pick, setPick] = useState<string | null>(null);
+  useEffect(() => { setPick(localStorage.getItem(PICK)); }, []);
+  const school = mine.find(s => s.schoolCode === pick) ?? mine.find(s => s.schoolCode === active?.schoolCode) ?? mine[0] ?? null;
+  const choose = (code: string) => { localStorage.setItem(PICK, code); setPick(code); setTab(t => t); };
+  const api = (path: string, o?: any) => apiFor(school!, path, o);
+  const q = <T,>(path: string | null) => useQuery<T>({ queryKey: ['admin', school?.schoolCode, path], queryFn: () => apiFor<T>(school!, path!), enabled: !!school && !!path }); // eslint-disable-line react-hooks/rules-of-hooks
+  const users = q<any[]>('/admin/users'); const reports = q<any[]>(tab === 1 ? '/admin/reports' : null); const settings = q<Settings>(tab >= 2 ? '/admin/settings' : null);
+  const [open, setOpen] = useState<string | null>(null);
+  if (flags && !mine.length) return <><PageHead title="School admin" /><Alert severity="warning">You're not a school admin.</Alert></>;
+  if (!school) return <><PageHead title="School admin" /><Loading rows={3} h={48} /></>;
+  if (users.error instanceof ApiError && users.error.status === 403) return <><PageHead title="School admin" /><Alert severity="warning">You're not an admin for {school.name}. If this just changed, sign out and back in.</Alert></>;
   const act = async (fn: () => Promise<any>, ok: string, refetch: () => any) => { try { await fn(); toast(ok); refetch(); } catch (e) { toast(errText(e), 'error'); } };
   return (<>
-    <PageHead kicker={school?.name} title="School admin" />
+    {mine.length > 1 && <TextField select size="small" label="School" value={school.schoolCode} onChange={e => choose(e.target.value)} sx={{ mb: 1.5, minWidth: 220, maxWidth: '100%' }}>
+      {mine.map(s => <MenuItem key={s._id} value={s.schoolCode}>{s.name}</MenuItem>)}</TextField>}
+    <PageHead kicker={mine.length > 1 ? undefined : school.name} title="School admin" />
     <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" sx={{ mb: 2 }} indicatorColor="secondary"><Tab label="Users" /><Tab label="Reports" /><Tab label="School settings" /><Tab label="Mailer" /></Tabs>
     {tab === 0 && (users.isLoading ? <Loading rows={3} h={48} /> : users.error ? <ErrorState error={users.error} retry={users.refetch} /> : !users.data?.length ? <Empty icon={<span>👥</span>} title="No users yet" /> :
       <Card><TableContainer><Table size="small"><TableHead><TableRow><TableCell>Name</TableCell><TableCell>Email</TableCell><TableCell>Role</TableCell><TableCell align="right">Banned</TableCell></TableRow></TableHead>
-        <TableBody>{users.data.map(u => <TableRow key={u._id}><TableCell>{u.name || shortId(u.sub)}</TableCell><TableCell>{u.eduEmail || (u.verified ? '' : 'unverified')}</TableCell><TableCell>{u.role || '—'}</TableCell>
+        <TableBody>{users.data.map(u => <TableRow key={u._id} hover><TableCell><Button size="small" sx={{ p: 0, minWidth: 0, textAlign: 'left', fontWeight: 700 }} onClick={() => setOpen(u._id)}>{u.name || shortId(u.sub)}</Button></TableCell><TableCell>{u.eduEmail || (u.verified ? '' : 'unverified')}</TableCell><TableCell>{u.role || '—'}</TableCell>
           <TableCell align="right"><Switch checked={!!u.banned} color="error" inputProps={{ 'aria-label': 'Ban ' + (u.name || u.sub) }} onChange={e => act(() => api('/admin/users/' + u._id + '/ban', { method: 'PUT', body: { banned: e.target.checked } }), e.target.checked ? 'User banned' : 'User unbanned', users.refetch)} /></TableCell></TableRow>)}</TableBody></Table></TableContainer></Card>)}
     {tab === 1 && (reports.isLoading ? <Loading rows={2} /> : reports.error ? <ErrorState error={reports.error} retry={reports.refetch} /> : !reports.data?.length ? <Empty icon={<span>🛡️</span>} title="No reports" body="Nothing to review." /> :
       <Stack gap={1.5}>{reports.data.map(r => <Card key={r._id} sx={{ p: 2 }}><Stack direction="row" justifyContent="space-between" gap={2} alignItems="flex-start">
@@ -46,8 +64,26 @@ export default function SchoolAdmin() {
         <TextField select size="small" value={r.status} sx={{ width: 140, flexShrink: 0 }} label="Status" onChange={e => act(() => api('/admin/reports/' + r._id, { method: 'PUT', body: { status: e.target.value } }), 'Report updated', reports.refetch)}>
           {['open', 'resolved', 'dismissed'].map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}</TextField></Stack></Card>)}</Stack>)}
     {tab >= 2 && (settings.isLoading ? <Loading rows={3} h={56} /> : settings.error ? <ErrorState error={settings.error} retry={settings.refetch} /> : settings.data &&
-      (tab === 2 ? <SettingsForm s={settings.data} save={b => api('/admin/settings', { method: 'PUT', body: b })} testRules={b => api('/admin/email-rules/test', { method: 'POST', body: b })} done={settings.refetch} /> : <MailerForm s={settings.data} save={b => api('/admin/settings', { method: 'PUT', body: b })} done={settings.refetch} />))}
+      (tab === 2 ? <SettingsForm key={school.schoolCode} s={settings.data} save={b => api('/admin/settings', { method: 'PUT', body: b })} testRules={b => api('/admin/email-rules/test', { method: 'POST', body: b })} done={settings.refetch} /> : <MailerForm key={school.schoolCode} s={settings.data} save={b => api('/admin/settings', { method: 'PUT', body: b })} done={settings.refetch} />))}
+    {open && <StudentDialog id={open} load={id => api('/admin/users/' + id)} onClose={() => setOpen(null)} />}
   </>);
+}
+function Row({ k, v }: { k: string; v: React.ReactNode }) { return <Stack direction="row" gap={2} sx={{ py: 0.5 }}><Typography variant="body2" color="text.secondary" sx={{ width: 120, flexShrink: 0 }}>{k}</Typography><Typography variant="body2" sx={{ minWidth: 0, wordBreak: 'break-word' }}>{v ?? '—'}</Typography></Stack>; }
+function StudentDialog({ id, load, onClose }: { id: string; load: (id: string) => Promise<any>; onClose: () => void }) {
+  const d = useQuery<any>({ queryKey: ['admin-student', id], queryFn: () => load(id) });
+  const u = d.data?.user;
+  return <Dialog open onClose={onClose} fullWidth maxWidth="sm" scroll="paper"><DialogTitle>{u?.name || 'Student'}</DialogTitle>
+    <DialogContent dividers>{d.isLoading ? <Loading rows={3} h={40} /> : d.error ? <ErrorState error={d.error} retry={d.refetch} /> : u && <Stack gap={2}>
+      <Stack direction="row" gap={1.5} alignItems="center"><Avatar src={u.avatar || undefined} alt="" sx={{ width: 48, height: 48 }}>{(u.name || '?')[0]}</Avatar>
+        <Stack direction="row" gap={0.75} flexWrap="wrap">{u.role && <Chip size="small" label={u.role} />}<Chip size="small" variant="outlined" color={u.verified ? 'success' : 'default'} label={u.verified ? 'Verified' : 'Unverified'} />{u.banned && <Chip size="small" color="error" label="Banned" />}</Stack></Stack>
+      <Box><Row k="School email" v={u.eduEmail} /><Row k="Personal email" v={u.personalEmail} /><Row k="Phone" v={u.phone} />{u.car && <Row k="Car" v={[u.car.make, u.car.model, u.car.color, u.car.plate].filter(Boolean).join(' · ')} />}<Row k="Joined" v={timeAgo(u.createdAt)} /><Row k="User ID" v={<span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{u.sub}</span>} /></Box>
+      <Divider />
+      <Box><Typography fontWeight={700} component="h3">Homes ({d.data.homes.length})</Typography>{d.data.homes.map((h: any) => <Typography key={h._id} variant="body2">{h.label} · {h.walkingRadius} m walk</Typography>)}</Box>
+      <Box><Typography fontWeight={700} component="h3">Ride requests ({d.data.requests.length})</Typography>{d.data.requests.slice(0, 10).map((r: any) => <Typography key={r._id} variant="body2">{r.direction} {r.startTime}–{r.endTime} · {r.status}</Typography>)}</Box>
+      <Box><Typography fontWeight={700} component="h3">Drives ({d.data.drives.length})</Typography>{d.data.drives.slice(0, 10).map((r: any) => <Typography key={r._id} variant="body2">{r.owner === u.sub ? 'Driving' : 'Riding'} · {r.direction} {r.startTime} · {r.status}</Typography>)}</Box>
+      <Box><Typography fontWeight={700} component="h3">Reports</Typography><Typography variant="body2">{d.data.reportsAbout.length} about them · {d.data.reportsBy.length} filed · {d.data.blocks} blocked</Typography></Box>
+    </Stack>}</DialogContent>
+    <DialogActions><Button onClick={onClose}>Close</Button></DialogActions></Dialog>;
 }
 type Settings = { officialName: string; campus: { name: string; address: string; latitude: number; longitude: number }; emailRules: Rule[]; limits: { maxCarpoolStudents: number; maxHomesPerUser: number; maxUsersPerEduEmail: number }; mailer: { provider: string; gmailUser?: string; fromName: string; clientId?: string; clientSecretSet: boolean; refreshTokenSet: boolean; configured: boolean } };
 const DOMAIN = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
