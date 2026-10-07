@@ -45,7 +45,7 @@ export default function CommuteForm({ c, homes, timeLabel }: { c: ReturnType<typ
       <Stack gap={1}><Typography variant="overline" color="text.secondary" id="when">When</Typography>
         <ToggleButtonGroup exclusive size="small" value={mode} onChange={(_, m) => m && setMode(m)} aria-labelledby="when"><ToggleButton value="weekly" sx={{ px: 2 }}>Every week</ToggleButton><ToggleButton value="once" sx={{ px: 2 }}>One day</ToggleButton></ToggleButtonGroup>
         {mode === 'weekly' ? (
-          <ToggleButtonGroup value={v.days} onChange={(_, d) => setV(x => ({ ...x, days: d }))} aria-label="Weekdays" sx={{ flexWrap: 'wrap', gap: 0.75, '& .MuiToggleButton-root': { border: '1px solid', borderColor: 'divider', borderRadius: '12px !important', flex: '1 0 40px', ml: '0 !important' } }}>
+          <ToggleButtonGroup value={v.days} onChange={(_, d) => setV(x => ({ ...x, days: d }))} aria-label="Weekdays" sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 0.75, '& .MuiToggleButton-root': { border: '1px solid', borderColor: 'divider', borderRadius: '12px !important', minWidth: 0, px: 0, ml: '0 !important' } }}>
             {DAYS.map((d, i) => <ToggleButton key={d} value={i} aria-label={d}>{d.slice(0, 2)}</ToggleButton>)}
           </ToggleButtonGroup>
         ) : <TextField type="date" label="Date" value={date} onChange={e => setDate(e.target.value)} error={pastDate} helperText={pastDate ? 'Pick today or a later date.' : ' '} slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: todayISO() } }} />}
