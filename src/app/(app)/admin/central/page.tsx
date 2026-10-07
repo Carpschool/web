@@ -47,13 +47,13 @@ export default function CentralAdmin() {
   async function enable(s: S, enabled: boolean) { try { await centralApi('/admin/schools/' + s.schoolCode + '/enabled', { method: 'PATCH', body: { enabled } }); toast(s.name + (enabled ? ' enabled' : ' disabled')); changed(); } catch (e) { toast(errText(e), 'error'); } }
   return (<>
     <PageHead kicker="Carpschool network" title="Network admin" />
-    <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" sx={{ mb: 2 }} indicatorColor="secondary"><Tab label="Schools" /><Tab label="Users" /><Tab label="Add school" /><Tab label="Settings" /></Tabs>
+    <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ mb: 2, mx: { xs: -1, sm: 0 } }} indicatorColor="secondary"><Tab label="Schools" /><Tab label="Users" /><Tab label="Add school" /><Tab label="Settings" /></Tabs>
     {tab === 0 && (q.isLoading ? <Loading rows={2} h={80} /> : q.error ? <ErrorState error={q.error} retry={q.refetch} /> : !q.data?.length ? <Empty icon={<span>🏫</span>} title="No schools yet" body="Add a school server from the Add school tab." /> :
       <Stack gap={1.5}>{q.data.map(s => { const on = s.enabled !== false; return <Card key={s._id} sx={{ p: 2, opacity: on ? 1 : 0.75 }}><Stack direction="row" alignItems="center" gap={1.5} flexWrap="wrap">
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap"><Typography fontWeight={700}>{s.name}</Typography><Typography component="span" color="text.secondary" sx={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{s.schoolCode}</Typography>
             <Chip size="small" variant="outlined" label={alive(s.lastHeartbeat) ? 'Online' : 'Offline'} color={alive(s.lastHeartbeat) ? 'success' : 'default'} />{!on && <Chip size="small" color="warning" label="Disabled" />}</Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-all' }}>{s.baseUrl}</Typography>
+          <Typography variant="body2" color="text.secondary" noWrap title={s.baseUrl} sx={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{s.baseUrl.replace(/^https:\/\//, '')}</Typography>
           <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 0.75 }}>{s.domains.map(d => <Chip key={d} size="small" label={'@' + d} />)}</Stack>
           <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 0.5 }}>ID {s._id} · heartbeat {s.lastHeartbeat ? timeAgo(s.lastHeartbeat) : 'never'}</Typography></Box>
         <Stack direction="row" alignItems="center" gap={0.5}>
