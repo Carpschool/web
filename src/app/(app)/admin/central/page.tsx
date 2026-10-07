@@ -34,16 +34,15 @@ const alive = (h?: string) => !!h && Date.now() - new Date(h).getTime() < 15 * 6
 export default function CentralAdmin() {
   const { centralApi, central, flags, reloadSchools } = useSchool(); const toast = useToast();
   const q = useQuery<S[]>({ queryKey: ['central-admin', central], queryFn: () => centralApi('/admin/schools'), enabled: !!central });
-  const [url, setUrl] = useState(''); const [busy, setBusy] = useState(false); const [edit, setEdit] = useState<S | null>(null);
+  const [edit, setEdit] = useState<S | null>(null);
   if (flags && !flags.admin) return <><PageHead title="Network admin" /><Alert severity="warning">This page is for Carpschool network admins.</Alert></>;
   if (q.error instanceof ApiError && q.error.status === 403) return <><PageHead title="Network admin" /><Alert severity="warning">Network admin required.</Alert></>;
   const changed = () => { q.refetch(); reloadSchools?.(); };
-  async function onboard() { setBusy(true); try { await centralApi('/admin/schools', { body: { baseUrl: url.trim() } }); toast('School onboarded'); setUrl(''); changed(); } catch (e) { toast(errText(e), 'error'); } setBusy(false); }
   async function trust(s: S, trusted: boolean) { try { await centralApi('/admin/schools/' + s.schoolCode + '/trust', { method: 'PATCH', body: { trusted } }); toast(trusted ? s.name + ' trusted' : s.name + ' untrusted'); changed(); } catch (e) { toast(errText(e), 'error'); } }
   return (<>
     <PageHead kicker="Carpschool network" title="Network admin" />
-    <Card sx={{ p: { xs: 2, sm: 2.5 }, mb: 3 }}><Typography variant="h6" component="h2">Onboard a school</Typography><Typography color="text.secondary" variant="body2" sx={{ mb: 2 }}>We fetch its metadata over HTTPS and verify it signs a challenge.</Typography>
-      <Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5}><TextField label="School server URL" placeholder="https://school.example.edu" value={url} onChange={e => setUrl(e.target.value)} /><Button variant="contained" disabled={!/^https:\/\//.test(url) || busy} onClick={onboard} sx={{ flexShrink: 0 }}>{busy ? 'Checking…' : 'Onboard'}</Button></Stack></Card>
+    <AddSchool onDone={changed} />
+    <CentralSettings />
     <Typography variant="h6" component="h2" sx={{ mb: 1.5 }}>Schools</Typography>
     {q.isLoading ? <Loading rows={2} h={80} /> : q.error ? <ErrorState error={q.error} retry={q.refetch} /> : !q.data?.length ? <Empty icon={<span>🏫</span>} title="No schools yet" body="Onboard a school server above." /> :
       <Stack gap={1.5} sx={{ mb: 4 }}>{q.data.map(s => <Card key={s._id} sx={{ p: 2, opacity: s.trusted ? 1 : 0.8 }}><Stack direction="row" alignItems="center" gap={1.5} flexWrap="wrap">
@@ -105,4 +104,56 @@ function Admins({ schools }: { schools: S[] }) {
           </Stack>
         </Stack></Card>; })}</Stack>}
   </>);
+}
+
+const CODE = /^[0-9a-f]{7}$/i, SCODE = /^[a-z0-9_-]{2,64}$/, ORIGIN = /^https:\/\/[^/\s]+\/?$/;
+function AddSchool({ onDone }: { onDone: () => void }) {
+  const { centralApi } = useSchool(); const toast = useToast();
+  const [f, setF] = useState({ baseUrl: '', code: '', schoolCode: '', name: '' }); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => { setErr(''); setF({ ...f, [k]: k === 'schoolCode' ? e.target.value.toLowerCase() : e.target.value }); };
+  const bad = { baseUrl: !!f.baseUrl && !ORIGIN.test(f.baseUrl.trim()), code: !!f.code && !CODE.test(f.code.trim()), schoolCode: !!f.schoolCode && !SCODE.test(f.schoolCode), name: !!f.name && f.name.trim().length < 2 };
+  const ready = ORIGIN.test(f.baseUrl.trim()) && CODE.test(f.code.trim()) && SCODE.test(f.schoolCode) && f.name.trim().length >= 2;
+  async function claim() {
+    setBusy(true); setErr('');
+    try { await centralApi('/admin/schools/claim', { body: { baseUrl: f.baseUrl.trim().replace(/\/$/, ''), code: f.code.trim(), schoolCode: f.schoolCode, name: f.name.trim() } }); toast(f.name.trim() + ' added and trusted'); setF({ baseUrl: '', code: '', schoolCode: '', name: '' }); onDone(); }
+    catch (e) { setErr(errText(e)); }
+    setBusy(false);
+  }
+  return <Card sx={{ p: { xs: 2, sm: 2.5 }, mb: 3 }}>
+    <Typography variant="h6" component="h2">Add school</Typography>
+    <Typography color="text.secondary" variant="body2" sx={{ mb: 2 }}>Start a fresh school server and copy the 7-character setup code from its log. The code works once; five wrong tries lock it and print a new one.</Typography>
+    <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+      <TextField label="School server URL" placeholder="https://school.example.edu" value={f.baseUrl} onChange={set('baseUrl')} error={bad.baseUrl} helperText={bad.baseUrl ? 'HTTPS origin, no path' : ' '} sx={{ gridColumn: { sm: '1 / -1' } }} />
+      <TextField label="Setup code" placeholder="a1b2c3d" value={f.code} onChange={set('code')} error={bad.code} helperText={bad.code ? '7 hex characters' : ' '} slotProps={{ htmlInput: { maxLength: 7, autoComplete: 'off', spellCheck: false, style: { fontFamily: 'var(--font-mono), monospace', letterSpacing: '0.12em' } } }} />
+      <TextField label="School code" placeholder="sentinel" value={f.schoolCode} onChange={set('schoolCode')} error={bad.schoolCode} helperText={bad.schoolCode ? 'a-z, 0-9, - or _' : 'Permanent short id'} />
+      <TextField label="Display name" placeholder="Sentinel Secondary" value={f.name} onChange={set('name')} error={bad.name} helperText={bad.name ? 'At least 2 characters' : 'The school admin can rename it later'} sx={{ gridColumn: { sm: '1 / -1' } }} />
+    </Box>
+    {err && <Alert severity="error" sx={{ mt: 1 }}>{err}</Alert>}
+    <Button variant="contained" disabled={!ready || busy} onClick={claim} sx={{ mt: 1.5 }}>{busy ? 'Claiming…' : 'Claim school'}</Button>
+  </Card>;
+}
+
+type CSet = { publicUrl: string; corsOrigins: string[]; webhookSecretSet: boolean };
+function CentralSettings() {
+  const { centralApi } = useSchool(); const toast = useToast();
+  const q = useQuery<CSet>({ queryKey: ['central-settings'], queryFn: () => centralApi('/admin/settings') });
+  const [f, setF] = useState({ publicUrl: '', origins: '', secret: '' }); const [busy, setBusy] = useState(false);
+  useEffect(() => { if (q.data) setF({ publicUrl: q.data.publicUrl, origins: q.data.corsOrigins.join('\n'), secret: '' }); }, [q.data]);
+  if (!q.data) return null;
+  const origins = f.origins.split(/[\s,]+/).filter(Boolean);
+  const bad = { publicUrl: !ORIGIN.test(f.publicUrl.trim()), origins: !origins.length || origins.some(o => !/^https?:\/\/[^/\s]+\/?$/.test(o)), secret: !!f.secret && !/^whsec_[A-Za-z0-9+/=]{16,}$/.test(f.secret.trim()) };
+  async function save(body: any, ok: string) { setBusy(true); try { await centralApi('/admin/settings', { method: 'PUT', body }); toast(ok); setF(x => ({ ...x, secret: '' })); await q.refetch(); } catch (e) { toast(errText(e), 'error'); } setBusy(false); }
+  return <Card sx={{ p: { xs: 2, sm: 2.5 }, mb: 3 }}>
+    <Typography variant="h6" component="h2">Central settings</Typography>
+    <Typography color="text.secondary" variant="body2" sx={{ mb: 2 }}>Stored in the central database. Changing the public URL changes the token issuer that every school has pinned.</Typography>
+    <Stack gap={1.5}>
+      <TextField label="Central public URL" value={f.publicUrl} onChange={e => setF({ ...f, publicUrl: e.target.value })} error={bad.publicUrl} helperText={bad.publicUrl ? 'HTTPS origin, no path' : ' '} />
+      <TextField label="Web app origins" multiline minRows={2} value={f.origins} onChange={e => setF({ ...f, origins: e.target.value })} error={bad.origins} helperText={bad.origins ? 'One origin per line' : 'Allowed for CORS and Clerk sign-in'} />
+      <TextField label="Clerk webhook secret" type="password" placeholder={q.data.webhookSecretSet ? '•••••••• saved' : 'whsec_…'} value={f.secret} onChange={e => setF({ ...f, secret: e.target.value })} error={bad.secret} helperText={bad.secret ? 'Should start with whsec_' : 'Write-only. Leave blank to keep the current one'} autoComplete="off" />
+      <Stack direction="row" gap={1}>
+        <Button variant="contained" disabled={busy || bad.publicUrl || bad.origins || bad.secret} onClick={() => save({ publicUrl: f.publicUrl.trim(), corsOrigins: origins.map(o => o.replace(/\/$/, '')), ...(f.secret ? { webhookSecret: f.secret.trim() } : {}) }, 'Central settings saved')}>{busy ? 'Saving…' : 'Save'}</Button>
+        {q.data.webhookSecretSet && <Button color="error" disabled={busy} onClick={() => save({ webhookSecret: null }, 'Webhook secret removed')}>Remove secret</Button>}
+      </Stack>
+    </Stack>
+  </Card>;
 }
