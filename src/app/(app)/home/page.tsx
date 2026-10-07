@@ -29,16 +29,18 @@ function Stub({ top, big }: { top: string; big: string }) { return <><Typography
 function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; }
 export default function Dashboard() {
   const { me, school, api } = useSchool(); const toast = useToast(); const driver = me?.role === 'driver';
-  const homes = useApi<Home[]>('/homes');
-  const reqs = useApi<Commute[]>(driver ? null : '/requests');
+  // Wait for the profile: role-specific endpoints 403 (and render the wrong shape) if fired before we know the role.
+  const rider = me?.role === 'rider';
+  const homes = useApi<Home[]>(me ? '/homes' : null);
+  const reqs = useApi<Commute[]>(rider ? '/requests' : null);
   const drives = useApi<Drive[]>(driver ? '/drives' : null);
-  const offers = useApi<{ negotiationId: string; driveId: string; requestId: string }[]>(driver ? null : '/matches', { refetchInterval: 20000 });
-  const pools = useApi<Drive[]>('/carpools', { refetchInterval: 30000 });
+  const offers = useApi<{ negotiationId: string; driveId: string; requestId: string }[]>(rider ? '/matches' : null, { refetchInterval: 20000 });
+  const pools = useApi<Drive[]>(me ? '/carpools' : null, { refetchInterval: 30000 });
   const [cancel, setCancel] = useState<Commute | null>(null);
   const homeName = (id: string) => homes.data?.find(h => h._id === id)?.label ?? 'Home';
-  const today = (pools.data || []).filter(p => p.status === 'active' && runsToday(p) && p.passengers.some(x => x.status === 'locked' || x.status === 'boarded'));
+  const today = (Array.isArray(pools.data) ? pools.data : []).filter(p => p.status === 'active' && runsToday(p) && p.passengers?.some(x => x.status === 'locked' || x.status === 'boarded'));
   const list = driver ? drives : reqs;
-  const active = (list.data || []).filter((x: Commute) => x.status === 'active' || x.status === 'locked');
+  const active = (Array.isArray(list.data) ? list.data : []).filter((x: Commute) => x.status === 'active' || x.status === 'locked');
   return (<>
     <Box className="rise" sx={{ mb: 4 }}>
       <Typography variant="overline" color="text.secondary">{school?.name}</Typography>
@@ -46,7 +48,7 @@ export default function Dashboard() {
     </Box>
     {homes.data && homes.data.length === 0 && <Box sx={{ mb: 4 }}><Empty icon={<Add />} title="Add a home to get started" body="Pickups are matched to where you live." action={<Button component={Link} href="/homes" variant="contained">Add home</Button>} /></Box>}
     <Section title="Today">
-      {pools.isLoading ? <Loading rows={1} /> : pools.error ? <ErrorState error={pools.error} retry={pools.refetch} /> : today.length === 0 ?
+      {!me || pools.isLoading ? <Loading rows={1} /> : pools.error ? <ErrorState error={pools.error} retry={pools.refetch} /> : today.length === 0 ?
         <Typography color="text.secondary" sx={{ py: 2 }}>No carpools today.</Typography> :
         <Stack gap={1.5}>{today.map(p => { const mine = driver ? p.passengers.filter(x => x.status !== 'left') : p.passengers; const first = [...mine].sort((a, b) => a.time.localeCompare(b.time))[0]; return (
           <Link key={p._id} href={'/rides/' + p._id} style={{ color: 'inherit', textDecoration: 'none' }}>
