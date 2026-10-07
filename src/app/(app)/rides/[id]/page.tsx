@@ -46,7 +46,7 @@ export default function Ride({ params }: { params: Promise<{ id: string }> }) {
   async function getPin() { setPinBusy(true); try { const r = await api('/carpools/' + id + '/pin', { method: 'POST' }); setPin(r.pin); } catch (e) { toast(errText(e), 'error'); } finally { setPinBusy(false); } }
   async function doBoard() {
     if (!board) return; setBBusy(true); setBErr('');
-    try { const { loc, approx } = await here(board.pickup); const r = await api('/carpools/' + id + '/board', { body: { rider: board.rider, pin: code, location: loc } });
+    try { const { loc, approx } = await here(board.pickup); const r = await api('/carpools/' + id + '/board', { body: { rider: board.rider, pin: code, location: loc, approximate: approx } });
       if (r?.invalid) { setBErr('Wrong PIN. Ask the rider to check their pass.'); setBBusy(false); return; }
       toast(approx ? 'Boarded (location approximate)' : 'Boarded'); setBoard(null); q.refetch(); } catch (e) { setBErr(errText(e)); } setBBusy(false);
   }
@@ -99,7 +99,7 @@ export default function Ride({ params }: { params: Promise<{ id: string }> }) {
       <DialogActions sx={{ p: 2 }}><Button onClick={() => setBoard(null)} disabled={bBusy}>Cancel</Button><Button variant="contained" disabled={code.length !== 4 || bBusy} onClick={doBoard}>{bBusy ? 'Checking…' : 'Board rider'}</Button></DialogActions>
     </Dialog>
     <Confirm open={!!drop} title="Complete drop-off?" body="We'll save one location snapshot and mark the ride done." confirmText="Complete" onClose={() => setDrop(null)}
-      onConfirm={async () => { try { const { loc } = await here(drop!.pickup); await api('/carpools/' + id + '/dropoff', { body: { rider: drop!.rider, location: loc } }); toast('Drop-off complete'); q.refetch(); } catch (e) { toast(errText(e), 'error'); } setDrop(null); }} />
+      onConfirm={async () => { try { const { loc, approx } = await here(drop!.pickup); await api('/carpools/' + id + '/dropoff', { body: { rider: drop!.rider, location: approx ? null : loc, approximate: approx } }); toast(approx ? 'Drop-off complete (location unavailable)' : 'Drop-off complete', approx ? 'info' : undefined); q.refetch(); } catch (e) { toast(errText(e), 'error'); } setDrop(null); }} />
     <Confirm open={!!leave} title={driver ? 'Remove this rider?' : 'Leave this carpool?'} body={driver ? 'Their seat opens up and they get an email.' : 'Your seat is released and the driver gets an email. Your request goes back into the pool.'} confirmText={driver ? 'Remove' : 'Leave'} danger onClose={() => setLeave(null)}
       onConfirm={async () => { try { await api('/carpools/' + id + '/leave', { body: { rider: leave!.rider } }); toast(driver ? 'Rider removed' : 'You left the carpool'); if (driver) q.refetch(); else router.replace('/rides'); } catch (e) { toast(errText(e), 'error'); } setLeave(null); }} />
   </>);
