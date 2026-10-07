@@ -7,8 +7,8 @@ export class ApiError extends Error { constructor(msg: string, public status: nu
 async function parse(r: Response) {
   const text = await r.text(); let j: any = null; try { j = text ? JSON.parse(text) : null; } catch {}
   if (!r.ok) {
-    let m = j?.message ?? j?.error ?? r.statusText;
-    if (typeof m === 'object') { const fe = m.fieldErrors ? Object.entries(m.fieldErrors).map(([k, v]: any) => k + ': ' + v[0]) : []; m = [...(m.formErrors || []), ...fe].join('. ') || 'Invalid input'; }
+    let m = j?.message ?? (j?.fieldErrors || j?.formErrors ? j : null) ?? j?.error ?? r.statusText;
+    if (typeof m === 'object') { const fe = m.fieldErrors ? Object.values(m.fieldErrors).map((v: any) => v[0]) : []; m = [...(m.formErrors || []), ...fe].join('. ') || 'Invalid input'; }
     if (Array.isArray(m)) m = m.join('. ');
     if (r.status === 429) m = 'Too many tries. Wait a minute and try again.';
     throw new ApiError(String(m || 'Request failed'), r.status);
