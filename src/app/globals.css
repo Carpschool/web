@@ -1,7 +1,6 @@
 html,body{margin:0;min-height:100%;-webkit-font-smoothing:antialiased}
 body{background:#F5F0E6}
 ::selection{background:#F2A900;color:#13203B}
-.leaflet-container{font-family:var(--font-body);border-radius:18px;background:#e9e3d6}
 .pin-dot{width:18px;height:18px;border-radius:50%;border:3px solid #FFFCF6;box-shadow:0 2px 8px rgba(19,32,59,.35)}
 @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .rise{animation:rise .45s cubic-bezier(.2,.7,.2,1) both}
