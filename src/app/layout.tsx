@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: 'Carpschool', description: 'Carpool w
 export const viewport: Viewport = { themeColor: '#F5F0E6', width: 'device-width', initialScale: 1 };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider appearance={{ variables: { colorPrimary: '#13203B', borderRadius: '12px', fontFamily: 'var(--font-body)' } }}>
+    <ClerkProvider appearance={{ variables: { colorPrimary: '#13203B', colorText: '#13203B', colorTextSecondary: '#4A5468', colorBackground: '#FFFDF8', borderRadius: '14px', fontFamily: 'var(--font-body)' }, elements: { card: { boxShadow: '0 1px 0 rgba(19,32,59,.08), 0 20px 50px -24px rgba(19,32,59,.35)', border: '1px solid rgba(19,32,59,.1)' }, formButtonPrimary: { borderRadius: '999px', textTransform: 'none', fontWeight: 700 }, headerTitle: { fontFamily: 'var(--font-display)', fontWeight: 750 } } }}>
       <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
         <body><Providers>{children}</Providers></body>
       </html>

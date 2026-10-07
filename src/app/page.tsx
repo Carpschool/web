@@ -31,7 +31,7 @@ export default function Landing() {
           <Box className="rise">
             <Typography variant="overline" color="text.secondary">Federated campus carpool</Typography>
             <Typography variant="h1" sx={{ fontSize: { xs: '3.2rem', sm: '4.4rem', md: '5.6rem' }, mt: 1 }}>
-              Get a ride with people from <Box component="span" sx={{ bgcolor: 'secondary.main', px: 1, borderRadius: 2, boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone' }}>your school</Box>.
+              Get a ride with people from <Box component="span" sx={{ whiteSpace: 'nowrap', backgroundImage: 'linear-gradient(transparent 62%, #F2A900 62%, #F2A900 92%, transparent 92%)' }}>your school</Box>.
             </Typography>
             <Typography sx={{ mt: 3, fontSize: '1.15rem', color: 'text.secondary', maxWidth: 480 }}>Riders post when they need to get to class. Drivers already heading that way pick them up. Everyone is a verified student.</Typography>
             <Stack direction="row" gap={1.5} sx={{ mt: 4 }} flexWrap="wrap">
@@ -48,8 +48,8 @@ export default function Landing() {
                 <Box textAlign="right"><Typography sx={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 40, lineHeight: 1 }}>SCH</Typography><Typography sx={{ opacity: 0.6, fontSize: 13 }}>Main entrance</Typography></Box>
               </Stack>
               <Box sx={{ borderTop: '2px dashed rgba(245,240,230,.25)', pt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'end' }}>
-                <Box><Typography sx={{ opacity: 0.6, fontSize: 12 }}>Driver</Typography><Typography fontWeight={700}>Grey Civic · 3 seats</Typography></Box>
-                <Box textAlign="right"><Typography sx={{ opacity: 0.6, fontSize: 12 }}>PIN</Typography><Typography sx={{ fontFamily: mono, fontWeight: 700, fontSize: 30, letterSpacing: '.2em', color: 'secondary.main' }}>4 8 1 6</Typography></Box>
+                <Box><Typography sx={{ opacity: 0.6, fontSize: 12 }}>Driver</Typography><Typography fontWeight={700} noWrap>Grey Civic · 3 seats</Typography></Box>
+                <Box textAlign="right"><Typography sx={{ opacity: 0.6, fontSize: 12 }}>PIN</Typography><Typography sx={{ fontFamily: mono, fontWeight: 700, fontSize: 28, letterSpacing: '.18em', whiteSpace: 'nowrap', color: 'secondary.main' }}>4816</Typography></Box>
               </Box>
             </Box>
           </Box>
