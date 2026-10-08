@@ -86,7 +86,7 @@ function StudentDialog({ id, load, onClose }: { id: string; load: (id: string) =
     </Stack>}</DialogContent>
     <DialogActions><Button onClick={onClose}>Close</Button></DialogActions></Dialog>;
 }
-type Settings = { officialName: string; campus: { name: string; address: string; latitude: number; longitude: number }; emailRules: Rule[]; limits: { maxCarpoolStudents: number; maxHomesPerUser: number; maxUsersPerEduEmail: number }; mailer: { provider: string; url?: string; secretSet?: boolean; smtpHost?: string; smtpPort?: number; smtpSecurity?: string; smtpUser?: string; smtpFrom?: string; smtpPasswordSet?: boolean; google?: { email: string | null; status: 'connected' | 'disconnected' | 'error'; connectedAt?: string | null; lastRefreshAt?: string | null; error?: string } | null; push?: { keyCreatedAt: string | null; lastTokenAt: string | null; lastTokenStatus: 'never' | 'ok' | 'expired' | 'rejected'; tokenExpiresAt: string | null; lastError?: string } | null; gmailUser?: string; fromName: string; configured: boolean } };
+type Settings = { officialName: string; campus: { name: string; address: string; latitude: number; longitude: number }; emailRules: Rule[]; limits: { maxCarpoolStudents: number; maxHomesPerUser: number; maxUsersPerEduEmail: number }; mailer: { provider: string; url?: string; secretSet?: boolean; smtpHost?: string; smtpPort?: number; smtpSecurity?: string; smtpUser?: string; smtpFrom?: string; smtpPasswordSet?: boolean; google?: { email: string | null; status: 'connected' | 'disconnected' | 'error'; connectedAt?: string | null; lastRefreshAt?: string | null; error?: string } | null; gmailUser?: string; fromName: string; configured: boolean } };
 const DOMAIN = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 function Section({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return <Box><Typography variant="subtitle1" fontWeight={700} component="h2">{title}</Typography>{sub && <Typography variant="body2" color="text.secondary">{sub}</Typography>}<Stack gap={2} sx={{ mt: 1.5 }}>{children}</Stack></Box>;
@@ -149,29 +149,31 @@ function CopyBlock({ label, value }: { label: string; value: string }) {
     <TextField value={value} fullWidth multiline minRows={2} maxRows={4} slotProps={{ input: { readOnly: true, sx: { fontFamily: 'monospace', fontSize: 12 } }, htmlInput: { spellCheck: false, autoComplete: 'off' } }} />
   </Box>;
 }
-type Generated = { code: string; manifest: string; keyCreatedAt: string };
-function PushPanel({ m, api, done }: { m: Settings['mailer']; api: (p: string, o?: any) => Promise<any>; done: () => any }) {
-  const toast = useToast(); const p = m.push;
-  const status = useQuery({ queryKey: ['mailer-push-status', m.fromName, m.provider], queryFn: () => api('/admin/mailer/appsscript/status'), refetchInterval: 10000, initialData: p });
-  const st: Settings['mailer']['push'] = status.data ?? p;
+type Generated = { codeGs: string; appsscriptJson: string; keyId: string };
+type PushStatus = { generated: boolean; keyId: string | null; tokenSet: boolean; tokenValid: boolean; expiresAt: string | null; lastPushAt: string | null };
+function PushPanel({ api, scope }: { api: (p: string, o?: any) => Promise<any>; scope: string }) {
+  const toast = useToast();
+  const status = useQuery<PushStatus>({ queryKey: ['mailer-push-status', scope], queryFn: () => api('/admin/mailer/appsscript/status'), refetchInterval: 10000, gcTime: 0 });
+  const st = status.data;
   const [gen, setGen] = useState<Generated | null>(null); const [busy, setBusy] = useState(false); const [confirm, setConfirm] = useState(false);
   async function generate(regenerate: boolean) {
     setBusy(true); setConfirm(false);
-    try { setGen(await api('/admin/mailer/appsscript/generate', { method: 'POST', body: { regenerate } })); await done(); }
-    catch (e: any) { if (e?.status === 409 || /KEY_EXISTS/.test(errText(e))) setConfirm(true); else toast(errText(e), 'error'); }
+    try { const r = await api('/admin/mailer/appsscript/generate', { method: 'POST', body: { regenerate } }); setGen({ codeGs: r.codeGs, appsscriptJson: r.appsscriptJson, keyId: r.keyId }); await status.refetch(); }
+    catch (e: any) { if (e?.status === 409) setConfirm(true); else toast(errText(e), 'error'); }
     finally { setBusy(false); }
   }
-  const tone = st?.lastTokenStatus === 'ok' ? 'success' : st?.lastTokenStatus === 'never' || !st ? 'default' : 'error';
+  const label = !st ? 'Loading' : !st.generated ? 'No script yet' : !st.tokenSet ? 'Waiting for first token' : st.tokenValid ? 'Receiving tokens' : 'Token expired';
+  const tone = st?.tokenValid ? 'success' : st?.tokenSet ? 'error' : 'default';
   return <Stack gap={2}>
     <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} alignItems={{ sm: 'center' }}>
-      <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Last token received</Typography><Typography variant="body1">{fmtWhen(st?.lastTokenAt)}</Typography>
-        {st?.tokenExpiresAt && <Typography variant="caption" color="text.secondary">Expires {fmtWhen(st.tokenExpiresAt)}</Typography>}</Box>
-      <Chip color={tone as any} label={st ? ({ never: 'No token yet', ok: 'Receiving tokens', expired: 'Token expired', rejected: 'Token rejected' } as const)[st.lastTokenStatus] : 'No key'} />
+      <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Last token received</Typography><Typography variant="body1">{fmtWhen(st?.lastPushAt)}</Typography>
+        {st?.expiresAt && <Typography variant="caption" color="text.secondary">Expires {fmtWhen(st.expiresAt)}</Typography>}</Box>
+      <Chip color={tone as any} label={label} />
     </Stack>
-    {st?.lastError && <Alert severity="warning">{st.lastError}</Alert>}
-    <Stack direction="row" gap={1.5} flexWrap="wrap">
-      <Button variant="outlined" disabled={busy} onClick={() => st?.keyCreatedAt ? setConfirm(true) : generate(false)}>{busy ? 'Generating…' : st?.keyCreatedAt ? 'Regenerate script' : 'Generate script'}</Button>
-      {st?.keyCreatedAt && <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>Key created {fmtWhen(st.keyCreatedAt)}</Typography>}
+    {status.isError && <Alert severity="warning">Couldn't load script status.</Alert>}
+    <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="center">
+      <Button variant="outlined" disabled={busy || !st} onClick={() => st?.generated ? setConfirm(true) : generate(false)}>{busy ? 'Generating…' : st?.generated ? 'Regenerate script' : 'Generate script'}</Button>
+      {st?.keyId && <Typography variant="caption" color="text.secondary">Key {st.keyId}</Typography>}
     </Stack>
     {gen && <Card variant="outlined" sx={{ p: 2 }}>
       <Alert severity="info" sx={{ mb: 2 }}>This script contains secrets and is shown only once. Copy it now; leaving this page hides it.</Alert>
@@ -181,7 +183,7 @@ function PushPanel({ m, api, done }: { m: Settings['mailer']; api: (p: string, o
         <li>Replace Code.gs and appsscript.json with the two blocks below and save.</li>
         <li>Select the <b>setup</b> function, click Run once and authorize. The status above turns green when the first token arrives.</li>
       </Typography>
-      <Stack gap={2}><CopyBlock label="Code.gs" value={gen.code} /><CopyBlock label="appsscript.json" value={gen.manifest} />
+      <Stack gap={2}><CopyBlock label="Code.gs" value={gen.codeGs} /><CopyBlock label="appsscript.json" value={gen.appsscriptJson} />
         <Button sx={{ alignSelf: 'flex-end' }} onClick={() => setGen(null)}>Hide</Button></Stack>
     </Card>}
     <Dialog open={confirm} onClose={() => setConfirm(false)}>
@@ -283,7 +285,7 @@ function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Pro
       </>}
       {pv === 'appsscript_push' && <>
         <Typography variant="body2" color="text.secondary">A script in the sending Google account pushes short-lived encrypted send tokens to this server. No Google passwords or OAuth secrets are stored here.</Typography>
-        <PushPanel m={m} api={api} done={done} />
+        <PushPanel api={api} scope={s.officialName} />
       </>}
     </Stack>
     <Stack direction="row" gap={1.5} justifyContent="flex-end" sx={{ mt: 3 }}>
