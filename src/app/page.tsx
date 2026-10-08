@@ -12,6 +12,7 @@ import RouteOutlined from '@mui/icons-material/RouteOutlined';
 import PinOutlined from '@mui/icons-material/PinOutlined';
 import { Wordmark } from '@/components/Brand';
 import { mono } from '@/theme';
+import { LegalFooter } from '@/components/LegalFooter';
 const steps = [
   { icon: <VerifiedUserOutlined />, t: 'Students only', b: 'Everyone verifies a school email before they can see a single ride.' },
   { icon: <RouteOutlined />, t: 'On your way', b: 'Drivers see riders who live within a short walk of their actual route.' },
@@ -58,6 +59,7 @@ export default function Landing() {
           {steps.map((s, i) => (<Box key={s.t} className="rise" sx={{ animationDelay: 200 + i * 80 + 'ms', p: 3, borderRadius: '22px', bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
             <Box sx={{ color: 'primary.main', mb: 1.5 }}>{s.icon}</Box><Typography variant="h6">{s.t}</Typography><Typography color="text.secondary" sx={{ mt: 0.5 }}>{s.b}</Typography></Box>))}
         </Box>
+        <LegalFooter />
       </Container>
     </Box>
   );

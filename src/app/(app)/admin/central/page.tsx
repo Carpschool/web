@@ -62,7 +62,7 @@ export default function CentralAdmin() {
       </Stack></Card>; })}</Stack>)}
     {tab === 1 && <Users onOpen={setWho} />}
     {tab === 2 && <AddSchool onDone={() => { changed(); setTab(0); }} />}
-    {tab === 3 && <CentralSettings />}
+    {tab === 3 && <><CentralSettings />{LEGAL.map(l => <LegalEditor key={l.doc} {...l} />)}</>}
     {edit && <SchoolAdmins s={edit} onClose={() => setEdit(null)} onOpen={setWho} />}
     {who && <UserDialog id={who} onClose={() => setWho(null)} />}
   </>);
@@ -163,3 +163,21 @@ function CentralSettings() {
     </Stack>
   </Card>;
 }
+
+const LEGAL: { doc: 'tos' | 'privacy'; label: string }[] = [{ doc: 'tos', label: 'Terms of Service' }, { doc: 'privacy', label: 'Privacy Policy' }];
+function LegalEditor({ doc, label }: { doc: 'tos' | 'privacy'; label: string }) {
+  const { central, centralApi } = useSchool(); const toast = useToast();
+  const q = useQuery<{ markdown: string; updatedAt: string | null }>({ queryKey: ['legal', doc], enabled: !!central, queryFn: async () => { const r = await fetch(central + '/legal/' + doc, { cache: 'no-store' }); if (!r.ok) throw new Error('Could not load'); return r.json(); } });
+  const [text, setText] = useState(''); const [busy, setBusy] = useState(false);
+  useEffect(() => { if (q.data) setText(q.data.markdown); }, [q.data]);
+  if (!q.data) return null;
+  const dirty = text !== q.data.markdown;
+  async function save() { setBusy(true); try { await centralApi('/admin/legal/' + doc, { method: 'PUT', body: { markdown: text } }); toast(label + ' saved'); await q.refetch(); } catch (e) { toast(errText(e), 'error'); } setBusy(false); }
+  return <Card sx={{ p: { xs: 2, sm: 2.5 }, mb: 3 }}>
+    <Stack direction="row" justifyContent="space-between" alignItems="baseline" gap={1} flexWrap="wrap"><Typography variant="h6" component="h2">{label}</Typography><Button size="small" href={'/' + doc} target="_blank" rel="noopener">View page</Button></Stack>
+    <Typography color="text.secondary" variant="body2" sx={{ mb: 2 }}>Markdown. Shown publicly at /{doc}; blank shows &ldquo;Coming soon&rdquo;. HTML is not rendered.{q.data.updatedAt ? ' Last saved ' + new Date(q.data.updatedAt).toLocaleString() + '.' : ''}</Typography>
+    <TextField multiline minRows={8} maxRows={30} fullWidth value={text} onChange={e => setText(e.target.value)} inputProps={{ maxLength: 100000, style: { fontFamily: 'var(--font-mono)', fontSize: 13 } }} placeholder="Blank" />
+    <Stack direction="row" gap={1} sx={{ mt: 1.5 }}><Button variant="contained" disabled={busy || !dirty} onClick={save}>{busy ? 'Saving…' : 'Save'}</Button>{dirty && <Button disabled={busy} onClick={() => setText(q.data!.markdown)}>Discard</Button>}</Stack>
+  </Card>;
+}
+
