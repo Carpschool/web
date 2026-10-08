@@ -6,7 +6,7 @@ import './globals.css';
 const display = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-display', display: 'swap' });
 const body = Instrument_Sans({ subsets: ['latin'], variable: '--font-body', display: 'swap' });
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', display: 'swap' });
-export const metadata: Metadata = { title: 'Carpschool', description: 'Carpool with verified students from your own school.' };
+export const metadata: Metadata = { title: 'Carpschool', description: 'Carpool with verified students from your own school.', manifest: '/manifest.webmanifest', icons: { icon: [{ url: '/favicon.ico' }, { url: '/icons/icon-light-192.png', media: '(prefers-color-scheme: light)' }, { url: '/icons/icon-dark-192.png', media: '(prefers-color-scheme: dark)' }], apple: '/apple-touch-icon.png' } };
 export const viewport: Viewport = { themeColor: '#F5F0E6', width: 'device-width', initialScale: 1 };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
