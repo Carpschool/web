@@ -139,26 +139,24 @@ function AddSchool({ onDone }: { onDone: () => void }) {
   </Card>;
 }
 
-type CSet = { publicUrl: string; corsOrigins: string[]; webhookSecretSet: boolean };
+type CSet = { publicUrl: string; corsOrigins: string[] };
 function CentralSettings() {
   const { centralApi } = useSchool(); const toast = useToast();
   const q = useQuery<CSet>({ queryKey: ['central-settings'], queryFn: () => centralApi('/admin/settings') });
-  const [f, setF] = useState({ publicUrl: '', origins: '', secret: '' }); const [busy, setBusy] = useState(false);
-  useEffect(() => { if (q.data) setF({ publicUrl: q.data.publicUrl, origins: q.data.corsOrigins.join('\n'), secret: '' }); }, [q.data]);
+  const [f, setF] = useState({ publicUrl: '', origins: '' }); const [busy, setBusy] = useState(false);
+  useEffect(() => { if (q.data) setF({ publicUrl: q.data.publicUrl, origins: q.data.corsOrigins.join('\n') }); }, [q.data]);
   if (!q.data) return null;
   const origins = f.origins.split(/[\s,]+/).filter(Boolean);
-  const bad = { publicUrl: !ORIGIN.test(f.publicUrl.trim()), origins: !origins.length || origins.some(o => !/^https?:\/\/[^/\s]+\/?$/.test(o)), secret: !!f.secret && !/^whsec_[A-Za-z0-9+/=]{16,}$/.test(f.secret.trim()) };
-  async function save(body: any, ok: string) { setBusy(true); try { await centralApi('/admin/settings', { method: 'PUT', body }); toast(ok); setF(x => ({ ...x, secret: '' })); await q.refetch(); } catch (e) { toast(errText(e), 'error'); } setBusy(false); }
+  const bad = { publicUrl: !ORIGIN.test(f.publicUrl.trim()), origins: !origins.length || origins.some(o => !/^https?:\/\/[^/\s]+\/?$/.test(o)) };
+  async function save(body: any, ok: string) { setBusy(true); try { await centralApi('/admin/settings', { method: 'PUT', body }); toast(ok); await q.refetch(); } catch (e) { toast(errText(e), 'error'); } setBusy(false); }
   return <Card sx={{ p: { xs: 2, sm: 2.5 }, mb: 3 }}>
     <Typography variant="h6" component="h2">Central settings</Typography>
     <Typography color="text.secondary" variant="body2" sx={{ mb: 2 }}>Stored in the central database. Changing the public URL changes the token issuer that every school has pinned.</Typography>
     <Stack gap={1.5}>
       <TextField label="Central public URL" value={f.publicUrl} onChange={e => setF({ ...f, publicUrl: e.target.value })} error={bad.publicUrl} helperText={bad.publicUrl ? 'HTTPS origin, no path' : ' '} />
       <TextField label="Web app origins" multiline minRows={2} value={f.origins} onChange={e => setF({ ...f, origins: e.target.value })} error={bad.origins} helperText={bad.origins ? 'One origin per line' : 'Allowed for CORS and Clerk sign-in'} />
-      <TextField label="Clerk webhook secret" type="password" placeholder={q.data.webhookSecretSet ? '•••••••• saved' : 'whsec_…'} value={f.secret} onChange={e => setF({ ...f, secret: e.target.value })} error={bad.secret} helperText={bad.secret ? 'Should start with whsec_' : 'Write-only. Leave blank to keep the current one'} autoComplete="off" />
       <Stack direction="row" gap={1}>
-        <Button variant="contained" disabled={busy || bad.publicUrl || bad.origins || bad.secret} onClick={() => save({ publicUrl: f.publicUrl.trim(), corsOrigins: origins.map(o => o.replace(/\/$/, '')), ...(f.secret ? { webhookSecret: f.secret.trim() } : {}) }, 'Central settings saved')}>{busy ? 'Saving…' : 'Save'}</Button>
-        {q.data.webhookSecretSet && <Button color="error" disabled={busy} onClick={() => save({ webhookSecret: null }, 'Webhook secret removed')}>Remove secret</Button>}
+        <Button variant="contained" disabled={busy || bad.publicUrl || bad.origins} onClick={() => save({ publicUrl: f.publicUrl.trim(), corsOrigins: origins.map(o => o.replace(/\/$/, '')) }, 'Central settings saved')}>{busy ? 'Saving…' : 'Save'}</Button>
       </Stack>
     </Stack>
   </Card>;
