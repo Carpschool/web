@@ -64,7 +64,7 @@ export default function SchoolAdmin() {
         <TextField select size="small" value={r.status} sx={{ width: 140, flexShrink: 0 }} label="Status" onChange={e => act(() => api('/admin/reports/' + r._id, { method: 'PUT', body: { status: e.target.value } }), 'Report updated', reports.refetch)}>
           {['open', 'resolved', 'dismissed'].map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}</TextField></Stack></Card>)}</Stack>)}
     {tab >= 2 && (settings.isLoading ? <Loading rows={3} h={56} /> : settings.error ? <ErrorState error={settings.error} retry={settings.refetch} /> : settings.data &&
-      (tab === 2 ? <SettingsForm key={school.schoolCode} s={settings.data} save={b => api('/admin/settings', { method: 'PUT', body: b })} testRules={b => api('/admin/email-rules/test', { method: 'POST', body: b })} done={settings.refetch} /> : <MailerForm key={school.schoolCode} s={settings.data} save={b => api('/admin/settings', { method: 'PUT', body: b })} done={settings.refetch} />))}
+      (tab === 2 ? <SettingsForm key={school.schoolCode} s={settings.data} save={b => api('/admin/settings', { method: 'PUT', body: b })} testRules={b => api('/admin/email-rules/test', { method: 'POST', body: b })} done={settings.refetch} /> : <MailerForm key={school.schoolCode} s={settings.data} save={b => api('/admin/settings', { method: 'PUT', body: b })} done={settings.refetch} api={api} />))}
     {open && <StudentDialog id={open} load={id => api('/admin/users/' + id)} onClose={() => setOpen(null)} />}
   </>);
 }
@@ -85,7 +85,7 @@ function StudentDialog({ id, load, onClose }: { id: string; load: (id: string) =
     </Stack>}</DialogContent>
     <DialogActions><Button onClick={onClose}>Close</Button></DialogActions></Dialog>;
 }
-type Settings = { officialName: string; campus: { name: string; address: string; latitude: number; longitude: number }; emailRules: Rule[]; limits: { maxCarpoolStudents: number; maxHomesPerUser: number; maxUsersPerEduEmail: number }; mailer: { provider: string; url?: string; secretSet?: boolean; gmailUser?: string; fromName: string; clientId?: string; clientSecretSet: boolean; refreshTokenSet: boolean; configured: boolean } };
+type Settings = { officialName: string; campus: { name: string; address: string; latitude: number; longitude: number }; emailRules: Rule[]; limits: { maxCarpoolStudents: number; maxHomesPerUser: number; maxUsersPerEduEmail: number }; mailer: { provider: string; url?: string; secretSet?: boolean; smtpHost?: string; smtpPort?: number; smtpSecurity?: string; smtpUser?: string; smtpFrom?: string; smtpPasswordSet?: boolean; push?: { keyCreatedAt: string | null; lastTokenAt: string | null; lastTokenStatus: 'never' | 'ok' | 'expired' | 'rejected'; tokenExpiresAt: string | null; lastError?: string } | null; gmailUser?: string; fromName: string; clientId?: string; clientSecretSet: boolean; refreshTokenSet: boolean; configured: boolean } };
 const DOMAIN = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 function Section({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return <Box><Typography variant="subtitle1" fontWeight={700} component="h2">{title}</Typography>{sub && <Typography variant="body2" color="text.secondary">{sub}</Typography>}<Stack gap={2} sx={{ mt: 1.5 }}>{children}</Stack></Box>;
@@ -139,52 +139,123 @@ function SecretField({ label, isSet, value, onChange, clear, onClear }: { label:
     placeholder={isSet && !clear ? '•••••••• saved' : ''} helperText={clear ? 'Will be removed on save' : isSet ? 'Leave blank to keep the saved value' : 'Not set'}
     slotProps={{ inputLabel: { shrink: true }, input: { endAdornment: isSet ? <InputAdornment position="end"><Button size="small" color={clear ? 'inherit' : 'error'} onClick={() => { onChange(''); onClear(!clear); }}>{clear ? 'Undo' : 'Remove'}</Button></InputAdornment> : undefined } }} />;
 }
+function fmtWhen(v?: string | null) { return v ? new Date(v).toLocaleString() : 'Never'; }
+function CopyBlock({ label, value }: { label: string; value: string }) {
+  const toast = useToast();
+  return <Box>
+    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}><Typography variant="body2" fontWeight={600}>{label}</Typography>
+      <Button size="small" onClick={() => navigator.clipboard.writeText(value).then(() => toast(label + ' copied'), () => toast('Copy failed', 'error'))}>Copy</Button></Stack>
+    <TextField value={value} fullWidth multiline minRows={2} maxRows={4} slotProps={{ input: { readOnly: true, sx: { fontFamily: 'monospace', fontSize: 12 } }, htmlInput: { spellCheck: false, autoComplete: 'off' } }} />
+  </Box>;
+}
+type Generated = { code: string; manifest: string; keyCreatedAt: string };
+function PushPanel({ m, api, done }: { m: Settings['mailer']; api: (p: string, o?: any) => Promise<any>; done: () => any }) {
+  const toast = useToast(); const p = m.push;
+  const status = useQuery({ queryKey: ['mailer-push-status', m.fromName, m.provider], queryFn: () => api('/admin/mailer/appsscript/status'), refetchInterval: 10000, initialData: p });
+  const st: Settings['mailer']['push'] = status.data ?? p;
+  const [gen, setGen] = useState<Generated | null>(null); const [busy, setBusy] = useState(false); const [confirm, setConfirm] = useState(false);
+  async function generate(regenerate: boolean) {
+    setBusy(true); setConfirm(false);
+    try { setGen(await api('/admin/mailer/appsscript/generate', { method: 'POST', body: { regenerate } })); await done(); }
+    catch (e: any) { if (e?.status === 409 || /KEY_EXISTS/.test(errText(e))) setConfirm(true); else toast(errText(e), 'error'); }
+    finally { setBusy(false); }
+  }
+  const tone = st?.lastTokenStatus === 'ok' ? 'success' : st?.lastTokenStatus === 'never' || !st ? 'default' : 'error';
+  return <Stack gap={2}>
+    <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} alignItems={{ sm: 'center' }}>
+      <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Last token received</Typography><Typography variant="body1">{fmtWhen(st?.lastTokenAt)}</Typography>
+        {st?.tokenExpiresAt && <Typography variant="caption" color="text.secondary">Expires {fmtWhen(st.tokenExpiresAt)}</Typography>}</Box>
+      <Chip color={tone as any} label={st ? ({ never: 'No token yet', ok: 'Receiving tokens', expired: 'Token expired', rejected: 'Token rejected' } as const)[st.lastTokenStatus] : 'No key'} />
+    </Stack>
+    {st?.lastError && <Alert severity="warning">{st.lastError}</Alert>}
+    <Stack direction="row" gap={1.5} flexWrap="wrap">
+      <Button variant="outlined" disabled={busy} onClick={() => st?.keyCreatedAt ? setConfirm(true) : generate(false)}>{busy ? 'Generating…' : st?.keyCreatedAt ? 'Regenerate script' : 'Generate script'}</Button>
+      {st?.keyCreatedAt && <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>Key created {fmtWhen(st.keyCreatedAt)}</Typography>}
+    </Stack>
+    {gen && <Card variant="outlined" sx={{ p: 2 }}>
+      <Alert severity="info" sx={{ mb: 2 }}>This script contains secrets and is shown only once. Copy it now; leaving this page hides it.</Alert>
+      <Typography variant="body2" component="ol" sx={{ pl: 2.5, mt: 0, mb: 2, '& li': { mb: 0.5 } }}>
+        <li>Open script.google.com while signed in as the sending account and create a new project.</li>
+        <li>Project Settings: tick "Show appsscript.json manifest file in editor".</li>
+        <li>Replace Code.gs and appsscript.json with the two blocks below and save.</li>
+        <li>Select the <b>setup</b> function, click Run once and authorize. The status above turns green when the first token arrives.</li>
+      </Typography>
+      <Stack gap={2}><CopyBlock label="Code.gs" value={gen.code} /><CopyBlock label="appsscript.json" value={gen.manifest} />
+        <Button sx={{ alignSelf: 'flex-end' }} onClick={() => setGen(null)}>Hide</Button></Stack>
+    </Card>}
+    <Dialog open={confirm} onClose={() => setConfirm(false)}>
+      <DialogTitle>Regenerate the script key?</DialogTitle>
+      <DialogContent><Typography variant="body2">The current Apps Script stops working immediately. Email codes won't send until you paste the new script and run setup again.</Typography></DialogContent>
+      <DialogActions><Button onClick={() => setConfirm(false)}>Cancel</Button><Button color="error" variant="contained" onClick={() => generate(true)}>Regenerate</Button></DialogActions>
+    </Dialog>
+  </Stack>;
+}
 const APPS_SCRIPT_URL = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/;
-function MailerForm({ s, save, done }: { s: Settings; save: (b: any) => Promise<any>; done: () => any }) {
-  const m = s.mailer; const init = () => ({ provider: m.provider === 'appsscript' ? 'appsscript' : m.provider === 'test' ? 'test' : 'gmail', url: m.url || '', secret: '', clearRelaySecret: false, gmailUser: m.gmailUser || '', fromName: m.fromName || '', clientId: m.clientId || '', clientSecret: '', refreshToken: '', clearSecret: false, clearToken: false });
+const PROVIDERS = [['smtp', 'SMTP'], ['gmail', 'Google OAuth'], ['appsscript_push', 'Google Apps Script']] as const;
+function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Promise<any>; done: () => any; api: (p: string, o?: any) => Promise<any> }) {
+  const m = s.mailer;
+  const init = () => ({ provider: m.provider, fromName: m.fromName || '',
+    smtpHost: m.smtpHost || '', smtpPort: m.smtpPort ? String(m.smtpPort) : '587', smtpSecurity: m.smtpSecurity || 'starttls', smtpUser: m.smtpUser || '', smtpFrom: m.smtpFrom || '', smtpPassword: '', clearSmtp: false,
+    gmailUser: m.gmailUser || '', clientId: m.clientId || '', clientSecret: '', refreshToken: '', clearSecret: false, clearToken: false,
+    url: m.url || '', secret: '', clearRelaySecret: false });
   const [f, setF] = useState(init); useEffect(() => setF(init()), [s]); // eslint-disable-line
   const { busy, run } = useSaver(save, done);
-  const relay = f.provider === 'appsscript', gmail = f.provider === 'gmail';
-  const emailBad = gmail && !!f.gmailUser && !/^\S+@\S+\.\S+$/.test(f.gmailUser);
-  const urlBad = relay && !!f.url.trim() && !APPS_SCRIPT_URL.test(f.url.trim());
-  const invalid = emailBad || urlBad;
+  const set = (k: keyof ReturnType<typeof init>) => (e: React.ChangeEvent<HTMLInputElement>) => setF(x => ({ ...x, [k]: e.target.value }));
+  const email = (v: string) => !v || /^\S+@\S+\.\S+$/.test(v);
+  const pv = f.provider;
+  const errs = { gmailUser: pv === 'gmail' && !email(f.gmailUser), smtpFrom: pv === 'smtp' && !email(f.smtpFrom), smtpPort: pv === 'smtp' && !(/^\d+$/.test(f.smtpPort) && +f.smtpPort >= 1 && +f.smtpPort <= 65535), url: pv === 'appsscript' && !!f.url.trim() && !APPS_SCRIPT_URL.test(f.url.trim()) };
+  const invalid = Object.values(errs).some(Boolean);
   const dirty = JSON.stringify(f) !== JSON.stringify(init());
+  const w = (b: any, k: string, v: string, clear: boolean) => { if (v) b[k] = v; else if (clear) b[k] = null; };
   function submit() {
-    const b: any = { provider: f.provider, fromName: f.fromName.trim() };
-    if (relay) {
-      if (f.url.trim()) b.url = f.url.trim();
-      if (f.secret) b.secret = f.secret; else if (f.clearRelaySecret) b.secret = null;
-    } else if (gmail) {
-      if (f.gmailUser.trim()) b.gmailUser = f.gmailUser.trim(); if (f.clientId.trim()) b.clientId = f.clientId.trim();
-      if (f.clientSecret) b.clientSecret = f.clientSecret; else if (f.clearSecret) b.clientSecret = null;
-      if (f.refreshToken) b.refreshToken = f.refreshToken; else if (f.clearToken) b.refreshToken = null;
-    }
+    const b: any = { provider: pv, fromName: f.fromName.trim() };
+    if (pv === 'smtp') { Object.assign(b, { smtpHost: f.smtpHost.trim(), smtpPort: +f.smtpPort, smtpSecurity: f.smtpSecurity, smtpUser: f.smtpUser.trim(), smtpFrom: f.smtpFrom.trim() }); w(b, 'smtpPassword', f.smtpPassword, f.clearSmtp); }
+    if (pv === 'gmail') { if (f.gmailUser.trim()) b.gmailUser = f.gmailUser.trim(); if (f.clientId.trim()) b.clientId = f.clientId.trim(); w(b, 'clientSecret', f.clientSecret, f.clearSecret); w(b, 'refreshToken', f.refreshToken, f.clearToken); }
+    if (pv === 'appsscript') { if (f.url.trim()) b.url = f.url.trim(); w(b, 'secret', f.secret, f.clearRelaySecret); }
     run({ mailer: b }, 'Mailer saved');
   }
-  const sameProvider = f.provider === m.provider;
-  const chip = !sameProvider ? { color: 'default' as const, label: 'Unsaved provider' } : m.provider === 'test' ? { color: 'warning' as const, label: 'Test mode' } : m.configured ? { color: 'success' as const, label: 'Configured' } : { color: 'warning' as const, label: 'Not configured' };
+  const chip = pv !== m.provider ? { color: 'default' as const, label: 'Unsaved provider' } : m.provider === 'test' ? { color: 'warning' as const, label: 'Test mode' } : m.configured ? { color: 'success' as const, label: 'Configured' } : { color: 'warning' as const, label: 'Not configured' };
   return (<Card component="form" sx={{ p: { xs: 2, sm: 3 } }} onSubmit={e => { e.preventDefault(); if (!invalid && dirty) submit(); }}>
     <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2} sx={{ mb: 2.5 }} flexWrap="wrap">
-      <Box sx={{ flex: 1, minWidth: 220 }}><Typography variant="subtitle1" fontWeight={700} component="h2">Verification email sender</Typography><Typography variant="body2" color="text.secondary">{relay ? 'Google Apps Script relay used to send student codes.' : 'Gmail OAuth used to send student codes.'} Secrets are never shown again after saving.</Typography></Box>
+      <Box sx={{ flex: 1, minWidth: 220 }}><Typography variant="subtitle1" fontWeight={700} component="h2">Verification email sender</Typography><Typography variant="body2" color="text.secondary">How student verification codes are sent. Secrets are never shown again after saving.</Typography></Box>
       <Chip color={chip.color} label={chip.label} />
     </Stack>
     <Stack gap={2}>
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
-        <TextField select label="Provider" value={f.provider} onChange={e => setF({ ...f, provider: e.target.value })} sx={{ minWidth: 200 }} helperText=" " slotProps={{ select: { native: true } }}>
-          <option value="gmail">Gmail OAuth</option><option value="appsscript">Apps Script relay</option>{m.provider === 'test' && <option value="test">Test mode</option>}
+        <TextField select label="Method" value={pv} onChange={set('provider')} sx={{ minWidth: 220 }} helperText=" ">
+          {PROVIDERS.map(([v, l]) => <MenuItem key={v} value={v}>{l}</MenuItem>)}
+          {m.provider === 'appsscript' && <MenuItem value="appsscript">Apps Script relay (interim)</MenuItem>}
+          {m.provider === 'test' && <MenuItem value="test">Test mode</MenuItem>}
         </TextField>
-        <TextField label="From name" value={f.fromName} onChange={e => setF({ ...f, fromName: e.target.value })} helperText="e.g. KJT Rides" sx={{ flex: 1 }} />
+        <TextField label="From name" value={f.fromName} onChange={set('fromName')} helperText="e.g. KJT Rides" sx={{ flex: 1 }} />
       </Stack>
-      {relay && <>
-        <TextField label="Deployment URL" type="url" value={f.url} onChange={e => setF({ ...f, url: e.target.value })} error={urlBad} placeholder="https://script.google.com/macros/s/…/exec" slotProps={{ inputLabel: { shrink: true } }}
-          helperText={urlBad ? 'Must be https://script.google.com/macros/s/<deployment>/exec' : 'Web app deployment URL ending in /exec'} />
-        <SecretField label="Shared secret" isSet={!!m.secretSet} value={f.secret} onChange={v => setF(x => ({ ...x, secret: v }))} clear={f.clearRelaySecret} onClear={v => setF(x => ({ ...x, clearRelaySecret: v }))} />
+      {pv === 'smtp' && <>
+        <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
+          <TextField label="Host" value={f.smtpHost} onChange={set('smtpHost')} sx={{ flex: 2 }} placeholder="smtp.example.com" slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField label="Port" value={f.smtpPort} onChange={set('smtpPort')} error={errs.smtpPort} sx={{ flex: 1 }} slotProps={{ htmlInput: { inputMode: 'numeric' } }} />
+          <TextField select label="Security" value={f.smtpSecurity} onChange={set('smtpSecurity')} sx={{ flex: 1, minWidth: 140 }}>
+            <MenuItem value="starttls">STARTTLS</MenuItem><MenuItem value="tls">TLS</MenuItem><MenuItem value="none">None</MenuItem></TextField>
+        </Stack>
+        <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
+          <TextField label="Username" value={f.smtpUser} onChange={set('smtpUser')} autoComplete="off" sx={{ flex: 1 }} />
+          <TextField label="From address" type="email" value={f.smtpFrom} onChange={set('smtpFrom')} error={errs.smtpFrom} helperText={errs.smtpFrom ? 'Enter a valid email' : ' '} sx={{ flex: 1 }} />
+        </Stack>
+        <SecretField label="Password" isSet={!!m.smtpPasswordSet} value={f.smtpPassword} onChange={v => setF(x => ({ ...x, smtpPassword: v }))} clear={f.clearSmtp} onClear={v => setF(x => ({ ...x, clearSmtp: v }))} />
       </>}
-      {gmail && <>
-        <TextField label="Gmail address" type="email" value={f.gmailUser} onChange={e => setF({ ...f, gmailUser: e.target.value })} error={emailBad} helperText={emailBad ? 'Enter a valid email' : ' '} />
-        <TextField label="OAuth client ID" value={f.clientId} onChange={e => setF({ ...f, clientId: e.target.value })} />
+      {pv === 'gmail' && <>
+        <TextField label="Gmail address" type="email" value={f.gmailUser} onChange={set('gmailUser')} error={errs.gmailUser} helperText={errs.gmailUser ? 'Enter a valid email' : ' '} />
+        <TextField label="OAuth client ID" value={f.clientId} onChange={set('clientId')} />
         <SecretField label="OAuth client secret" isSet={m.clientSecretSet} value={f.clientSecret} onChange={v => setF(x => ({ ...x, clientSecret: v }))} clear={f.clearSecret} onClear={v => setF(x => ({ ...x, clearSecret: v }))} />
         <SecretField label="OAuth refresh token" isSet={m.refreshTokenSet} value={f.refreshToken} onChange={v => setF(x => ({ ...x, refreshToken: v }))} clear={f.clearToken} onClear={v => setF(x => ({ ...x, clearToken: v }))} />
+      </>}
+      {pv === 'appsscript' && <>
+        <Alert severity="info">Interim relay. Switch to Google Apps Script once its token is arriving.</Alert>
+        <TextField label="Deployment URL" type="url" value={f.url} onChange={set('url')} error={errs.url} helperText={errs.url ? 'Must be https://script.google.com/macros/s/<deployment>/exec' : ' '} />
+        <SecretField label="Shared secret" isSet={!!m.secretSet} value={f.secret} onChange={v => setF(x => ({ ...x, secret: v }))} clear={f.clearRelaySecret} onClear={v => setF(x => ({ ...x, clearRelaySecret: v }))} />
+      </>}
+      {pv === 'appsscript_push' && <>
+        <Typography variant="body2" color="text.secondary">A script in the sending Google account pushes short-lived encrypted send tokens to this server. No Google passwords or OAuth secrets are stored here.</Typography>
+        <PushPanel m={m} api={api} done={done} />
       </>}
     </Stack>
     <Stack direction="row" gap={1.5} justifyContent="flex-end" sx={{ mt: 3 }}>
