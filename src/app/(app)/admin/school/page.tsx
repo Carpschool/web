@@ -85,7 +85,7 @@ function StudentDialog({ id, load, onClose }: { id: string; load: (id: string) =
     </Stack>}</DialogContent>
     <DialogActions><Button onClick={onClose}>Close</Button></DialogActions></Dialog>;
 }
-type Settings = { officialName: string; campus: { name: string; address: string; latitude: number; longitude: number }; emailRules: Rule[]; limits: { maxCarpoolStudents: number; maxHomesPerUser: number; maxUsersPerEduEmail: number }; mailer: { provider: string; gmailUser?: string; fromName: string; clientId?: string; clientSecretSet: boolean; refreshTokenSet: boolean; configured: boolean } };
+type Settings = { officialName: string; campus: { name: string; address: string; latitude: number; longitude: number }; emailRules: Rule[]; limits: { maxCarpoolStudents: number; maxHomesPerUser: number; maxUsersPerEduEmail: number }; mailer: { provider: string; url?: string; secretSet?: boolean; gmailUser?: string; fromName: string; clientId?: string; clientSecretSet: boolean; refreshTokenSet: boolean; configured: boolean } };
 const DOMAIN = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 function Section({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return <Box><Typography variant="subtitle1" fontWeight={700} component="h2">{title}</Typography>{sub && <Typography variant="body2" color="text.secondary">{sub}</Typography>}<Stack gap={2} sx={{ mt: 1.5 }}>{children}</Stack></Box>;
@@ -139,36 +139,57 @@ function SecretField({ label, isSet, value, onChange, clear, onClear }: { label:
     placeholder={isSet && !clear ? '•••••••• saved' : ''} helperText={clear ? 'Will be removed on save' : isSet ? 'Leave blank to keep the saved value' : 'Not set'}
     slotProps={{ inputLabel: { shrink: true }, input: { endAdornment: isSet ? <InputAdornment position="end"><Button size="small" color={clear ? 'inherit' : 'error'} onClick={() => { onChange(''); onClear(!clear); }}>{clear ? 'Undo' : 'Remove'}</Button></InputAdornment> : undefined } }} />;
 }
+const APPS_SCRIPT_URL = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/;
 function MailerForm({ s, save, done }: { s: Settings; save: (b: any) => Promise<any>; done: () => any }) {
-  const m = s.mailer; const init = () => ({ gmailUser: m.gmailUser || '', fromName: m.fromName || '', clientId: m.clientId || '', clientSecret: '', refreshToken: '', clearSecret: false, clearToken: false });
+  const m = s.mailer; const init = () => ({ provider: m.provider === 'appsscript' ? 'appsscript' : m.provider === 'test' ? 'test' : 'gmail', url: m.url || '', secret: '', clearRelaySecret: false, gmailUser: m.gmailUser || '', fromName: m.fromName || '', clientId: m.clientId || '', clientSecret: '', refreshToken: '', clearSecret: false, clearToken: false });
   const [f, setF] = useState(init); useEffect(() => setF(init()), [s]); // eslint-disable-line
   const { busy, run } = useSaver(save, done);
-  const emailBad = !!f.gmailUser && !/^\S+@\S+\.\S+$/.test(f.gmailUser);
+  const relay = f.provider === 'appsscript', gmail = f.provider === 'gmail';
+  const emailBad = gmail && !!f.gmailUser && !/^\S+@\S+\.\S+$/.test(f.gmailUser);
+  const urlBad = relay && !!f.url.trim() && !APPS_SCRIPT_URL.test(f.url.trim());
+  const invalid = emailBad || urlBad;
   const dirty = JSON.stringify(f) !== JSON.stringify(init());
   function submit() {
-    const b: any = { fromName: f.fromName.trim() };
-    if (f.gmailUser.trim()) b.gmailUser = f.gmailUser.trim(); if (f.clientId.trim()) b.clientId = f.clientId.trim();
-    if (f.clientSecret) b.clientSecret = f.clientSecret; else if (f.clearSecret) b.clientSecret = null;
-    if (f.refreshToken) b.refreshToken = f.refreshToken; else if (f.clearToken) b.refreshToken = null;
+    const b: any = { provider: f.provider, fromName: f.fromName.trim() };
+    if (relay) {
+      if (f.url.trim()) b.url = f.url.trim();
+      if (f.secret) b.secret = f.secret; else if (f.clearRelaySecret) b.secret = null;
+    } else if (gmail) {
+      if (f.gmailUser.trim()) b.gmailUser = f.gmailUser.trim(); if (f.clientId.trim()) b.clientId = f.clientId.trim();
+      if (f.clientSecret) b.clientSecret = f.clientSecret; else if (f.clearSecret) b.clientSecret = null;
+      if (f.refreshToken) b.refreshToken = f.refreshToken; else if (f.clearToken) b.refreshToken = null;
+    }
     run({ mailer: b }, 'Mailer saved');
   }
-  return (<Card component="form" sx={{ p: { xs: 2, sm: 3 } }} onSubmit={e => { e.preventDefault(); if (!emailBad && dirty) submit(); }}>
+  const sameProvider = f.provider === m.provider;
+  const chip = !sameProvider ? { color: 'default' as const, label: 'Unsaved provider' } : m.provider === 'test' ? { color: 'warning' as const, label: 'Test mode' } : m.configured ? { color: 'success' as const, label: 'Configured' } : { color: 'warning' as const, label: 'Not configured' };
+  return (<Card component="form" sx={{ p: { xs: 2, sm: 3 } }} onSubmit={e => { e.preventDefault(); if (!invalid && dirty) submit(); }}>
     <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2} sx={{ mb: 2.5 }} flexWrap="wrap">
-      <Box sx={{ flex: 1, minWidth: 220 }}><Typography variant="subtitle1" fontWeight={700} component="h2">Verification email sender</Typography><Typography variant="body2" color="text.secondary">Gmail OAuth used to send student codes. Secrets are never shown again after saving.</Typography></Box>
-      <Chip color={m.configured ? 'success' : 'warning'} label={m.provider === 'test' ? 'Test mode' : m.configured ? 'Configured' : 'Not configured'} />
+      <Box sx={{ flex: 1, minWidth: 220 }}><Typography variant="subtitle1" fontWeight={700} component="h2">Verification email sender</Typography><Typography variant="body2" color="text.secondary">{relay ? 'Google Apps Script relay used to send student codes.' : 'Gmail OAuth used to send student codes.'} Secrets are never shown again after saving.</Typography></Box>
+      <Chip color={chip.color} label={chip.label} />
     </Stack>
     <Stack gap={2}>
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
-        <TextField label="Gmail address" type="email" value={f.gmailUser} onChange={e => setF({ ...f, gmailUser: e.target.value })} error={emailBad} helperText={emailBad ? 'Enter a valid email' : ' '} />
-        <TextField label="From name" value={f.fromName} onChange={e => setF({ ...f, fromName: e.target.value })} helperText="e.g. KJT Rides" />
+        <TextField select label="Provider" value={f.provider} onChange={e => setF({ ...f, provider: e.target.value })} sx={{ minWidth: 200 }} helperText=" " slotProps={{ select: { native: true } }}>
+          <option value="gmail">Gmail OAuth</option><option value="appsscript">Apps Script relay</option>{m.provider === 'test' && <option value="test">Test mode</option>}
+        </TextField>
+        <TextField label="From name" value={f.fromName} onChange={e => setF({ ...f, fromName: e.target.value })} helperText="e.g. KJT Rides" sx={{ flex: 1 }} />
       </Stack>
-      <TextField label="OAuth client ID" value={f.clientId} onChange={e => setF({ ...f, clientId: e.target.value })} />
-      <SecretField label="OAuth client secret" isSet={m.clientSecretSet} value={f.clientSecret} onChange={v => setF(x => ({ ...x, clientSecret: v }))} clear={f.clearSecret} onClear={v => setF(x => ({ ...x, clearSecret: v }))} />
-      <SecretField label="OAuth refresh token" isSet={m.refreshTokenSet} value={f.refreshToken} onChange={v => setF(x => ({ ...x, refreshToken: v }))} clear={f.clearToken} onClear={v => setF(x => ({ ...x, clearToken: v }))} />
+      {relay && <>
+        <TextField label="Deployment URL" type="url" value={f.url} onChange={e => setF({ ...f, url: e.target.value })} error={urlBad} placeholder="https://script.google.com/macros/s/…/exec" slotProps={{ inputLabel: { shrink: true } }}
+          helperText={urlBad ? 'Must be https://script.google.com/macros/s/<deployment>/exec' : 'Web app deployment URL ending in /exec'} />
+        <SecretField label="Shared secret" isSet={!!m.secretSet} value={f.secret} onChange={v => setF(x => ({ ...x, secret: v }))} clear={f.clearRelaySecret} onClear={v => setF(x => ({ ...x, clearRelaySecret: v }))} />
+      </>}
+      {gmail && <>
+        <TextField label="Gmail address" type="email" value={f.gmailUser} onChange={e => setF({ ...f, gmailUser: e.target.value })} error={emailBad} helperText={emailBad ? 'Enter a valid email' : ' '} />
+        <TextField label="OAuth client ID" value={f.clientId} onChange={e => setF({ ...f, clientId: e.target.value })} />
+        <SecretField label="OAuth client secret" isSet={m.clientSecretSet} value={f.clientSecret} onChange={v => setF(x => ({ ...x, clientSecret: v }))} clear={f.clearSecret} onClear={v => setF(x => ({ ...x, clearSecret: v }))} />
+        <SecretField label="OAuth refresh token" isSet={m.refreshTokenSet} value={f.refreshToken} onChange={v => setF(x => ({ ...x, refreshToken: v }))} clear={f.clearToken} onClear={v => setF(x => ({ ...x, clearToken: v }))} />
+      </>}
     </Stack>
     <Stack direction="row" gap={1.5} justifyContent="flex-end" sx={{ mt: 3 }}>
       <Button disabled={!dirty || busy} onClick={() => setF(init())}>Reset</Button>
-      <Button type="submit" variant="contained" disabled={!dirty || emailBad || busy}>{busy ? 'Saving…' : 'Save mailer'}</Button>
+      <Button type="submit" variant="contained" disabled={!dirty || invalid || busy}>{busy ? 'Saving…' : 'Save mailer'}</Button>
     </Stack>
   </Card>);
 }
