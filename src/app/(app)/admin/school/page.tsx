@@ -274,8 +274,9 @@ function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Pro
           <TextField label="Host" value={f.smtpHost} onChange={set('smtpHost')} sx={{ flex: 2 }} placeholder="smtp.example.com" slotProps={{ inputLabel: { shrink: true } }} />
           <TextField label="Port" value={f.smtpPort} onChange={set('smtpPort')} error={errs.smtpPort} sx={{ flex: 1 }} slotProps={{ htmlInput: { inputMode: 'numeric' } }} />
           <TextField select label="Security" value={f.smtpSecurity} onChange={set('smtpSecurity')} sx={{ flex: 1, minWidth: 140 }}>
-            <MenuItem value="starttls">STARTTLS</MenuItem><MenuItem value="tls">TLS</MenuItem><MenuItem value="none">None</MenuItem></TextField>
+            <MenuItem value="starttls">STARTTLS</MenuItem><MenuItem value="tls">TLS</MenuItem><MenuItem value="none">None (plaintext)</MenuItem></TextField>
         </Stack>
+        {f.smtpSecurity === 'none' && <Alert severity="warning">No encryption: the SMTP password and every message are sent in plaintext. Use only on a trusted private network.</Alert>}
         <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
           <TextField label="Username" value={f.smtpUser} onChange={set('smtpUser')} autoComplete="off" sx={{ flex: 1 }} />
           <TextField label="From address" type="email" value={f.smtpFrom} onChange={set('smtpFrom')} error={errs.smtpFrom} helperText={errs.smtpFrom ? 'Enter a valid email' : ' '} sx={{ flex: 1 }} />
