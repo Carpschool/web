@@ -238,18 +238,19 @@ function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Pro
   const m = s.mailer;
   const init = () => ({ provider: m.provider, fromName: m.fromName || '',
     smtpHost: m.smtpHost || '', smtpPort: m.smtpPort ? String(m.smtpPort) : '587', smtpSecurity: m.smtpSecurity || 'starttls', smtpUser: m.smtpUser || '', smtpFrom: m.smtpFrom || '', smtpPassword: '', clearSmtp: false,
-    url: m.url || '', secret: '', clearRelaySecret: false });
+    url: m.url || '', secret: '', clearRelaySecret: false, gmailUser: m.gmailUser || '' });
   const [f, setF] = useState(init); useEffect(() => setF(init()), [s]); // eslint-disable-line
   const { busy, run } = useSaver(save, done);
   const set = (k: keyof ReturnType<typeof init>) => (e: React.ChangeEvent<HTMLInputElement>) => setF(x => ({ ...x, [k]: e.target.value }));
   const email = (v: string) => !v || /^\S+@\S+\.\S+$/.test(v);
   const pv = f.provider;
-  const errs = { smtpFrom: pv === 'smtp' && !email(f.smtpFrom), smtpPort: pv === 'smtp' && !(/^\d+$/.test(f.smtpPort) && +f.smtpPort >= 1 && +f.smtpPort <= 65535), url: pv === 'appsscript' && !!f.url.trim() && !APPS_SCRIPT_URL.test(f.url.trim()) };
+  const errs = { smtpFrom: pv === 'smtp' && !email(f.smtpFrom), smtpPort: pv === 'smtp' && !(/^\d+$/.test(f.smtpPort) && +f.smtpPort >= 1 && +f.smtpPort <= 65535), gmailUser: pv === 'appsscript_push' && !email(f.gmailUser), url: pv === 'appsscript' && !!f.url.trim() && !APPS_SCRIPT_URL.test(f.url.trim()) };
   const invalid = Object.values(errs).some(Boolean);
   const dirty = JSON.stringify(f) !== JSON.stringify(init());
   const w = (b: any, k: string, v: string, clear: boolean) => { if (v) b[k] = v; else if (clear) b[k] = null; };
   function submit() {
     const b: any = { provider: pv, fromName: f.fromName.trim() };
+    if (pv === 'appsscript_push') b.gmailUser = f.gmailUser.trim();
     if (pv === 'smtp') { Object.assign(b, { smtpHost: f.smtpHost.trim(), smtpPort: +f.smtpPort, smtpSecurity: f.smtpSecurity, smtpUser: f.smtpUser.trim(), smtpFrom: f.smtpFrom.trim() }); w(b, 'smtpPassword', f.smtpPassword, f.clearSmtp); }
     if (pv === 'appsscript') { if (f.url.trim()) b.url = f.url.trim(); w(b, 'secret', f.secret, f.clearRelaySecret); }
     run({ mailer: b }, 'Mailer saved');
@@ -290,6 +291,7 @@ function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Pro
       </>}
       {pv === 'appsscript_push' && <>
         <Typography variant="body2" color="text.secondary">A script in the sending Google account pushes short-lived encrypted send tokens to this server. No Google passwords or OAuth secrets are stored here.</Typography>
+        <TextField label="Sending account" type="email" value={f.gmailUser} onChange={set('gmailUser')} error={errs.gmailUser} placeholder="name@school.ca" slotProps={{ inputLabel: { shrink: true }, htmlInput: { spellCheck: false, autoComplete: 'off' } }} helperText={errs.gmailUser ? 'Enter a valid email' : 'The Google account the script runs as; codes are sent from this address'} />
         <PushPanel api={api} scope={s.officialName} />
       </>}
     </Stack>
