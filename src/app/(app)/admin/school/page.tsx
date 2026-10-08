@@ -86,7 +86,7 @@ function StudentDialog({ id, load, onClose }: { id: string; load: (id: string) =
     </Stack>}</DialogContent>
     <DialogActions><Button onClick={onClose}>Close</Button></DialogActions></Dialog>;
 }
-type Settings = { officialName: string; campus: { name: string; address: string; latitude: number; longitude: number }; emailRules: Rule[]; limits: { maxCarpoolStudents: number; maxHomesPerUser: number; maxUsersPerEduEmail: number }; mailer: { provider: string; url?: string; secretSet?: boolean; smtpHost?: string; smtpPort?: number; smtpSecurity?: string; smtpUser?: string; smtpFrom?: string; smtpPasswordSet?: boolean; google?: { email: string | null; status: 'connected' | 'disconnected' | 'error'; connectedAt?: string | null; lastRefreshAt?: string | null; error?: string } | null; gmailUser?: string; fromName: string; configured: boolean } };
+type Settings = { officialName: string; campus: { name: string; address: string; latitude: number; longitude: number }; emailRules: Rule[]; limits: { maxCarpoolStudents: number; maxHomesPerUser: number; maxUsersPerEduEmail: number }; mailer: { provider: string; url?: string; secretSet?: boolean; smtpHost?: string; smtpPort?: number; smtpSecurity?: string; smtpUser?: string; smtpFrom?: string; smtpPasswordSet?: boolean; gmailUser?: string; fromName: string; configured: boolean } };
 const DOMAIN = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 function Section({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return <Box><Typography variant="subtitle1" fontWeight={700} component="h2">{title}</Typography>{sub && <Typography variant="body2" color="text.secondary">{sub}</Typography>}<Stack gap={2} sx={{ mt: 1.5 }}>{children}</Stack></Box>;
@@ -196,8 +196,11 @@ function PushPanel({ api, scope }: { api: (p: string, o?: any) => Promise<any>; 
     </Dialog>
   </Stack>;
 }
-function GooglePanel({ m, api, done }: { m: Settings['mailer']; api: (p: string, o?: any) => Promise<any>; done: () => any }) {
-  const toast = useToast(); const [busy, setBusy] = useState(false); const [confirm, setConfirm] = useState(false); const gl = m.google;
+type GoogleStatus = { connected: boolean; email: string | null; expiresAt: string | null };
+function GooglePanel({ api, scope, done }: { api: (p: string, o?: any) => Promise<any>; scope: string; done: () => any }) {
+  const toast = useToast(); const [busy, setBusy] = useState(false); const [confirm, setConfirm] = useState(false);
+  const status = useQuery<GoogleStatus>({ queryKey: ['mailer-google-status', scope], queryFn: () => api('/admin/mailer/google/status'), retry: false });
+  const gl = status.data;
   async function connect() {
     setBusy(true);
     try { const r = await api('/admin/mailer/google/connect', { method: 'POST', body: { returnPath: '/admin/school?tab=mailer' } }); if (typeof r?.url !== 'string' || !/^https:\/\//.test(r.url)) throw new Error('Bad connect URL'); window.location.assign(r.url); }
@@ -205,22 +208,24 @@ function GooglePanel({ m, api, done }: { m: Settings['mailer']; api: (p: string,
   }
   async function disconnect() {
     setBusy(true); setConfirm(false);
-    try { await api('/admin/mailer/google/disconnect', { method: 'POST', body: {} }); toast('Gmail disconnected'); await done(); } catch (e) { toast(errText(e), 'error'); } finally { setBusy(false); }
+    try { await api('/admin/mailer/google/disconnect', { method: 'POST', body: {} }); toast('Gmail disconnected'); await status.refetch(); await done(); } catch (e) { toast(errText(e), 'error'); } finally { setBusy(false); }
   }
-  const st = gl?.status ?? 'disconnected';
+  const expired = !!(gl?.connected && gl.expiresAt && new Date(gl.expiresAt).getTime() < Date.now());
+  const st: 'connected' | 'error' | 'disconnected' | 'unknown' = status.isError ? 'unknown' : !gl ? 'unknown' : !gl.connected ? 'disconnected' : expired ? 'error' : 'connected';
   return <Stack gap={2}>
     <Typography variant="body2" color="text.secondary">Sign in with the sending Google account. CarpSchool's central server holds the Google credentials and hands this school short-lived send access.</Typography>
     <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} alignItems={{ sm: 'center' }}>
-      <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Connected account</Typography><Typography variant="body1">{gl?.email || 'None'}</Typography>
-        {gl?.lastRefreshAt && <Typography variant="caption" color="text.secondary">Last refreshed {fmtWhen(gl.lastRefreshAt)}</Typography>}</Box>
-      <Chip color={st === 'connected' ? 'success' : st === 'error' ? 'error' : 'default'} label={({ connected: 'Connected', error: 'Needs reconnect', disconnected: 'Not connected' } as const)[st]} />
+      <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Connected account</Typography><Typography variant="body1">{status.isLoading ? 'Checking…' : gl?.connected && gl.email || 'None'}</Typography>
+        {gl?.connected && gl.expiresAt && <Typography variant="caption" color="text.secondary">Access {expired ? 'expired' : 'valid until'} {fmtWhen(gl.expiresAt)}</Typography>}</Box>
+      <Chip color={st === 'connected' ? 'success' : st === 'error' ? 'error' : 'default'} label={({ connected: 'Connected', error: 'Needs reconnect', disconnected: 'Not connected', unknown: status.isLoading ? 'Checking' : 'Unavailable' } as const)[st]} />
     </Stack>
-    {gl?.error && <Alert severity="warning">{gl.error}</Alert>}
+    {status.isError && <Alert severity="warning" action={<Button color="inherit" size="small" onClick={() => status.refetch()}>Retry</Button>}>Couldn't load Gmail connection status.</Alert>}
     <Stack direction="row" gap={1.5} flexWrap="wrap">
-      <Button variant="outlined" disabled={busy} onClick={connect}>{busy ? 'Opening Google…' : st === 'disconnected' ? 'Connect Gmail' : 'Reconnect'}</Button>
-      {st !== 'disconnected' && <Button color="error" disabled={busy} onClick={() => setConfirm(true)}>Disconnect</Button>}
+      <Button variant="outlined" disabled={busy || status.isLoading} onClick={connect}>{busy ? 'Opening Google…' : gl?.connected ? 'Reconnect' : 'Connect Gmail'}</Button>
+      {gl?.connected && <Button color="error" disabled={busy} onClick={() => setConfirm(true)}>Disconnect</Button>}
     </Stack>
     <Dialog open={confirm} onClose={() => setConfirm(false)}>
+
       <DialogTitle>Disconnect Gmail?</DialogTitle>
       <DialogContent><Typography variant="body2">Verification codes stop sending until another method is set up or Gmail is reconnected.</Typography></DialogContent>
       <DialogActions><Button onClick={() => setConfirm(false)}>Cancel</Button><Button color="error" variant="contained" onClick={disconnect}>Disconnect</Button></DialogActions>
@@ -277,7 +282,7 @@ function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Pro
         </Stack>
         <SecretField label="Password" isSet={!!m.smtpPasswordSet} value={f.smtpPassword} onChange={v => setF(x => ({ ...x, smtpPassword: v }))} clear={f.clearSmtp} onClear={v => setF(x => ({ ...x, clearSmtp: v }))} />
       </>}
-      {pv === 'google' && <GooglePanel m={m} api={api} done={done} />}
+      {pv === 'google' && <GooglePanel api={api} scope={s.officialName} done={done} />}
       {pv === 'gmail' && <Alert severity="info">Legacy Gmail setup{m.gmailUser ? ' (' + m.gmailUser + ')' : ''} is still active. Its credentials can't be edited here; switch to Google (Gmail) and connect to replace it.</Alert>}
       {pv === 'appsscript' && <>
         <Alert severity="info">Interim relay. Switch to Google Apps Script once its token is arriving.</Alert>
