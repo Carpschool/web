@@ -136,9 +136,12 @@ function SettingsForm({ s, save, done, testRules }: { s: Settings; save: (b: any
   </Card>);
 }
 function SecretField({ label, isSet, value, onChange, clear, onClear }: { label: string; isSet: boolean; value: string; onChange: (v: string) => void; clear: boolean; onClear: (v: boolean) => void }) {
-  return <TextField label={label} type="password" autoComplete="new-password" value={value} onChange={e => { onChange(e.target.value); onClear(false); }}
-    placeholder={isSet && !clear ? '•••••••• saved' : ''} helperText={clear ? 'Will be removed on save' : isSet ? 'Leave blank to keep the saved value' : 'Not set'}
-    slotProps={{ inputLabel: { shrink: true }, input: { endAdornment: isSet ? <InputAdornment position="end"><Button size="small" color={clear ? 'inherit' : 'error'} onClick={() => { onChange(''); onClear(!clear); }}>{clear ? 'Undo' : 'Remove'}</Button></InputAdornment> : undefined } }} />;
+  return <Stack direction="row" gap={1} alignItems="flex-start">
+    <TextField label={label} type="password" autoComplete="new-password" value={value} onChange={e => { onChange(e.target.value); onClear(false); }}
+      placeholder={isSet && !clear ? '•••••••• saved' : ''} helperText={clear ? 'Will be removed on save' : isSet ? 'Leave blank to keep the saved value' : 'Not set'}
+      slotProps={{ inputLabel: { shrink: true } }} />
+    {isSet && <Button variant="outlined" color={clear ? 'inherit' : 'error'} sx={{ mt: 0.75, flexShrink: 0 }} onClick={() => { onChange(''); onClear(!clear); }}>{clear ? 'Undo' : 'Remove'}</Button>}
+  </Stack>;
 }
 function fmtWhen(v?: string | null) { return v ? new Date(v).toLocaleString() : 'Never'; }
 function CopyBlock({ label, value }: { label: string; value: string }) {
@@ -255,13 +258,13 @@ function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Pro
     </Stack>
     <Stack gap={2}>
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
-        <TextField select label="Method" value={pv} onChange={set('provider')} sx={{ minWidth: 220 }} helperText=" ">
+        <TextField select label="Method" value={pv} onChange={set('provider')} sx={{ width: { sm: 260 }, flexShrink: 0 }} helperText=" ">
           {PROVIDERS.map(([v, l]) => <MenuItem key={v} value={v}>{l}</MenuItem>)}
           {m.provider === 'gmail' && <MenuItem value="gmail">Gmail OAuth (legacy)</MenuItem>}
           {m.provider === 'appsscript' && <MenuItem value="appsscript">Apps Script relay (interim)</MenuItem>}
           {m.provider === 'test' && <MenuItem value="test">Test mode</MenuItem>}
         </TextField>
-        <TextField label="From name" value={f.fromName} onChange={set('fromName')} helperText="e.g. KJT Rides" sx={{ flex: 1 }} />
+        <TextField label="From name" value={f.fromName} onChange={set('fromName')} helperText="e.g. KJT Rides" />
       </Stack>
       {pv === 'smtp' && <>
         <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
@@ -280,7 +283,7 @@ function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Pro
       {pv === 'gmail' && <Alert severity="info">Legacy Gmail setup{m.gmailUser ? ' (' + m.gmailUser + ')' : ''} is still active. Its credentials can't be edited here; switch to Google (Gmail) and connect to replace it.</Alert>}
       {pv === 'appsscript' && <>
         <Alert severity="info">Interim relay. Switch to Google Apps Script once its token is arriving.</Alert>
-        <TextField label="Deployment URL" type="url" value={f.url} onChange={set('url')} error={errs.url} helperText={errs.url ? 'Must be https://script.google.com/macros/s/<deployment>/exec' : ' '} />
+        <TextField label="Deployment URL" type="url" multiline maxRows={3} value={f.url} onChange={set('url')} error={errs.url} slotProps={{ htmlInput: { spellCheck: false, style: { wordBreak: 'break-all' } } }} helperText={errs.url ? 'Must be https://script.google.com/macros/s/<deployment>/exec' : ' '} />
         <SecretField label="Shared secret" isSet={!!m.secretSet} value={f.secret} onChange={v => setF(x => ({ ...x, secret: v }))} clear={f.clearRelaySecret} onClear={v => setF(x => ({ ...x, clearRelaySecret: v }))} />
       </>}
       {pv === 'appsscript_push' && <>
