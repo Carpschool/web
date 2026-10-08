@@ -1,145 +1,64 @@
 'use client';
-
-import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { CentralAPI, School } from '@/lib/api';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { UntrustedBanner } from '@/components/untrusted-banner';
-import { School as SchoolIcon, Car, ShieldCheck, ArrowRight, Globe } from 'lucide-react';
-
-export default function LandingPage() {
-  const router = useRouter();
-  const [schools, setSchools] = useState<School[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [customUrl, setCustomUrl] = useState('');
-  const [selectedCustom, setSelectedCustom] = useState(false);
-
-  useEffect(() => {
-    CentralAPI.getSchools()
-      .then((data) => setSchools(data))
-      .catch((err) => console.error('Failed to load schools:', err))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleSelectSchool = (school: School) => {
-    localStorage.setItem('selected_school_code', school.schoolCode);
-    localStorage.setItem('selected_school_url', school.baseUrl);
-    localStorage.setItem('is_trusted_school', 'true');
-    router.push('/onboarding');
-  };
-
-  const handleSelectCustom = () => {
-    if (!customUrl.trim()) return;
-    const cleanUrl = customUrl.trim().replace(/\/+$/, '');
-    localStorage.setItem('selected_school_code', 'custom');
-    localStorage.setItem('selected_school_url', cleanUrl);
-    localStorage.setItem('is_trusted_school', 'false');
-    router.push('/onboarding');
-  };
-
+import Link from 'next/link';
+import { useAuth } from '@clerk/nextjs';
+import Box from '@mui/material/Box';
+import Container from '@mui/material/Container';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
+import ArrowForward from '@mui/icons-material/ArrowForward';
+import VerifiedUserOutlined from '@mui/icons-material/VerifiedUserOutlined';
+import RouteOutlined from '@mui/icons-material/RouteOutlined';
+import PinOutlined from '@mui/icons-material/PinOutlined';
+import { Wordmark } from '@/components/Brand';
+import { mono } from '@/theme';
+const steps = [
+  { icon: <VerifiedUserOutlined />, t: 'Students only', b: 'Everyone verifies a school email before they can see a single ride.' },
+  { icon: <RouteOutlined />, t: 'On your way', b: 'Drivers see riders who live within a short walk of their actual route.' },
+  { icon: <PinOutlined />, t: 'PIN to board', b: 'Riders show a 4 digit code at pickup. No live tracking, ever.' },
+];
+export default function Landing() {
+  const { isSignedIn } = useAuth();
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-b from-slate-50 to-slate-100">
-      <div className="max-w-xl w-full space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-            <Car className="h-4 w-4" /> Carpschool 2.0
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-            Campus Ridesharing Network
-          </h1>
-          <p className="text-sm text-slate-600">
-            Decentralized student carpooling. Zero payments, zero live GPS tracking, physical boarding safety PINs.
-          </p>
-        </div>
-
-        {/* School Picker Card */}
-        <Card className="shadow-md">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <SchoolIcon className="h-5 w-5 text-primary" /> Select Your University
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Choose your verified institution from the central directory, or enter a self-hosted custom server.
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-4">
-            {/* Trusted Schools List */}
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Verified School Servers
-              </p>
-              {loading ? (
-                <p className="text-xs text-muted-foreground animate-pulse">Loading directory...</p>
-              ) : schools.length === 0 ? (
-                <div className="p-3 border rounded-md text-xs text-slate-500 text-center bg-slate-50">
-                  No verified schools listed yet. You can connect to a custom server below.
-                </div>
-              ) : (
-                schools.map((school) => (
-                  <div
-                    key={school._id || school.schoolCode}
-                    onClick={() => handleSelectSchool(school)}
-                    className="p-3 border rounded-md flex items-center justify-between hover:bg-slate-50 cursor-pointer transition"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm text-slate-900">
-                          {school.officialName}
-                        </span>
-                        <Badge variant="success" className="text-[10px] gap-0.5">
-                          <ShieldCheck className="h-3 w-3" /> Verified
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                        {school.baseUrl}
-                      </p>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-slate-400" />
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Custom / Untrusted Server Accordion */}
-            <div className="pt-3 border-t space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                  <Globe className="h-3.5 w-3.5" /> Custom / Self-Hosted School Server
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Input
-                  placeholder="https://rides.myschool.org"
-                  value={customUrl}
-                  onChange={(e) => {
-                    setCustomUrl(e.target.value);
-                    setSelectedCustom(true);
-                  }}
-                  className="text-xs"
-                />
-                {selectedCustom && customUrl && (
-                  <UntrustedBanner serverUrl={customUrl} />
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full text-xs"
-                  onClick={handleSelectCustom}
-                  disabled={!customUrl.trim()}
-                >
-                  Connect to Custom Server
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </main>
+    <Box sx={{ minHeight: '100dvh', overflow: 'hidden', position: 'relative' }}>
+      <Box aria-hidden sx={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(19,32,59,.09) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to bottom, black, transparent 70%)' }} />
+      <Container maxWidth="lg" sx={{ position: 'relative' }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 2.5 }}>
+          <Wordmark />
+          <Button component={Link} href={isSignedIn ? '/home' : '/sign-in'} color="primary" variant="outlined">{isSignedIn ? 'Open app' : 'Sign in'}</Button>
+        </Stack>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.15fr 1fr' }, gap: { xs: 5, md: 8 }, alignItems: 'center', pt: { xs: 5, md: 10 }, pb: 8 }}>
+          <Box className="rise">
+            <Typography variant="overline" color="text.secondary">Federated campus carpool</Typography>
+            <Typography variant="h1" sx={{ fontSize: { xs: '3.2rem', sm: '4.4rem', md: '5.6rem' }, mt: 1 }}>
+              Get a ride with people from <Box component="span" sx={{ whiteSpace: 'nowrap', backgroundImage: 'linear-gradient(transparent 62%, #F2A900 62%, #F2A900 92%, transparent 92%)' }}>your school</Box>.
+            </Typography>
+            <Typography sx={{ mt: 3, fontSize: '1.15rem', color: 'text.secondary', maxWidth: 480 }}>Riders post when they need to get to class. Drivers already heading that way pick them up. Everyone is a verified student.</Typography>
+            <Stack direction="row" gap={1.5} sx={{ mt: 4 }} flexWrap="wrap">
+              <Button component={Link} href={isSignedIn ? '/home' : '/sign-up'} size="large" variant="contained" endIcon={<ArrowForward />}>Get started</Button>
+              {!isSignedIn && <Button component={Link} href="/sign-in" size="large" color="primary">I have an account</Button>}
+            </Stack>
+          </Box>
+          <Box className="rise" sx={{ animationDelay: '120ms' }}>
+            <Box sx={{ bgcolor: 'primary.main', color: '#F5F0E6', borderRadius: '28px', p: 3, transform: { md: 'rotate(2deg)' }, boxShadow: '0 30px 60px -20px rgba(19,32,59,.45)' }}>
+              <Stack direction="row" justifyContent="space-between"><Typography sx={{ fontFamily: mono, fontSize: 12, opacity: 0.7, letterSpacing: '.14em' }}>BOARDING PASS</Typography><Typography sx={{ fontFamily: mono, fontSize: 12, opacity: 0.7 }}>MON 07:45</Typography></Stack>
+              <Stack direction="row" alignItems="center" gap={2} sx={{ my: 3 }}>
+                <Box><Typography sx={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 40, lineHeight: 1 }}>HOME</Typography><Typography sx={{ opacity: 0.6, fontSize: 13 }}>Chartwell Dr</Typography></Box>
+                <Box sx={{ flex: 1, borderTop: '2px dashed rgba(245,240,230,.4)', position: 'relative' }}><Box sx={{ position: 'absolute', left: '50%', top: -13, transform: 'translateX(-50%)', bgcolor: 'secondary.main', color: 'primary.main', borderRadius: 99, px: 1, fontSize: 12, fontWeight: 700 }}>12 min</Box></Box>
+                <Box textAlign="right"><Typography sx={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 40, lineHeight: 1 }}>SCH</Typography><Typography sx={{ opacity: 0.6, fontSize: 13 }}>Main entrance</Typography></Box>
+              </Stack>
+              <Box sx={{ borderTop: '2px dashed rgba(245,240,230,.25)', pt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'end' }}>
+                <Box><Typography sx={{ opacity: 0.6, fontSize: 12 }}>Driver</Typography><Typography fontWeight={700} noWrap>Grey Civic · 3 seats</Typography></Box>
+                <Box textAlign="right"><Typography sx={{ opacity: 0.6, fontSize: 12 }}>PIN</Typography><Typography sx={{ fontFamily: mono, fontWeight: 700, fontSize: 28, letterSpacing: '.18em', whiteSpace: 'nowrap', color: 'secondary.main' }}>4816</Typography></Box>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2, pb: 10 }}>
+          {steps.map((s, i) => (<Box key={s.t} className="rise" sx={{ animationDelay: 200 + i * 80 + 'ms', p: 3, borderRadius: '22px', bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ color: 'primary.main', mb: 1.5 }}>{s.icon}</Box><Typography variant="h6">{s.t}</Typography><Typography color="text.secondary" sx={{ mt: 0.5 }}>{s.b}</Typography></Box>))}
+        </Box>
+      </Container>
+    </Box>
   );
 }

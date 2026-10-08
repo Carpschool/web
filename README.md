@@ -1,35 +1,25 @@
-# Carpschool Web Client
+# Carpschool web
 
-Modern web application for the **Carpschool** federated carpool network, built with:
-- **Next.js 15** (App Router & React 19)
-- **shadcn/ui** components (`https://ui.shadcn.com/docs/components`)
-- **Tailwind CSS**
-- **Clerk Authentication** (`@clerk/nextjs`)
-- **Socket.io Client** for real-time negotiation chat
+Next.js (App Router) + Clerk + MUI client for Carpschool.
 
----
+The web app talks to the central server for school discovery and federation tickets, then to the chosen school server for everything else. Maps use Leaflet with CARTO/OpenStreetMap tiles, place search goes through a server-side Google Places proxy, and drive routes come from an OSRM-compatible router.
 
-## Getting Started
+## Run
 
-1. Copy environment template:
-   ```bash
-   cp .env.example .env.local
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start local development server:
-   ```bash
-   npm run dev
-   ```
-   Open `http://localhost:3000`.
-
----
-
-## Docker Deployment
-
-Build and run using the multi-stage Dockerfile:
-```bash
-docker compose up --build
+```sh
+cp .env.example .env   # fill in Clerk keys, central URL, Places key
+npm ci
+npm run dev
 ```
+
+Production: `npm run build && node .next/standalone/server.js` (copy `.next/static` next to it), or use the Dockerfile.
+
+## Admin
+
+Admin access comes only from Clerk private metadata:
+
+```json
+{ "admin": false, "school": { "<schoolId>": { "admin": false } } }
+```
+
+Network admins can grant school admin from the Network admin page.

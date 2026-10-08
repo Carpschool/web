@@ -1,0 +1,12 @@
+export type Point = { type: 'Point'; coordinates: [number, number] };
+export type School = { _id: string; schoolCode: string; name: string; domains: string[]; baseUrl: string; lastHeartbeat?: string; trusted?: boolean };
+export type Me = { _id: string; sub: string; verified: boolean; eduEmail?: string; role?: 'rider' | 'driver'; name?: string; phone?: string; avatar?: string; personalEmail?: string; car?: { make: string; color: string; plate: string }; licenseConfirmed?: boolean; banned?: boolean };
+export type Home = { _id: string; label: string; location: Point; walkingRadius: number };
+export type Commute = { _id: string; homeId: string; direction: 'to-school' | 'home'; dates: string[]; days: number[]; startTime: string; endTime: string; status: string; createdAt: string };
+export type Drive = Commute & { route?: { coordinates: [number, number][] }; seats: number; availableSeats: number; owner: string; passengers: Passenger[] };
+export type Passenger = { _id: string; rider: string; negotiationId: string; pickup: Point; time: string; status: string };
+export type Match = { requestId: string; rider: string; distanceMeters: number; startTime: string; endTime: string };
+export type Negotiation = { _id: string; driver: string; rider: string; driveId: string; requestId: string; status: string; createdAt: string; updatedAt: string };
+export type Message = { _id: string; negotiationId: string; author: string; text: string; createdAt: string };
+export type Proposal = { _id: string; negotiationId: string; author: string; pickup: Point; time: string; status: 'pending' | 'accepted' | 'countered' | string; createdAt: string };
+export type SchoolMeta = { schoolCode: string; name: string; campus: { coordinates: [number, number] }; limits: { homes: number; seats: number } };
