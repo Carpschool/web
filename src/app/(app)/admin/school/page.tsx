@@ -210,14 +210,13 @@ function GooglePanel({ api, scope, done }: { api: (p: string, o?: any) => Promis
     setBusy(true); setConfirm(false);
     try { await api('/admin/mailer/google/disconnect', { method: 'POST', body: {} }); toast('Gmail disconnected'); await status.refetch(); await done(); } catch (e) { toast(errText(e), 'error'); } finally { setBusy(false); }
   }
-  const expired = !!(gl?.connected && gl.expiresAt && new Date(gl.expiresAt).getTime() < Date.now());
-  const st: 'connected' | 'error' | 'disconnected' | 'unknown' = status.isError ? 'unknown' : !gl ? 'unknown' : !gl.connected ? 'disconnected' : expired ? 'error' : 'connected';
+  const st: 'connected' | 'disconnected' | 'unknown' = status.isError ? 'unknown' : !gl ? 'unknown' : !gl.connected ? 'disconnected' : 'connected';
   return <Stack gap={2}>
     <Typography variant="body2" color="text.secondary">Sign in with the sending Google account. CarpSchool's central server holds the Google credentials and hands this school short-lived send access.</Typography>
     <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} alignItems={{ sm: 'center' }}>
       <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Connected account</Typography><Typography variant="body1">{status.isLoading ? 'Checking…' : gl?.connected && gl.email || 'None'}</Typography>
-        {gl?.connected && gl.expiresAt && <Typography variant="caption" color="text.secondary">Access {expired ? 'expired' : 'valid until'} {fmtWhen(gl.expiresAt)}</Typography>}</Box>
-      <Chip color={st === 'connected' ? 'success' : st === 'error' ? 'error' : 'default'} label={({ connected: 'Connected', error: 'Needs reconnect', disconnected: 'Not connected', unknown: status.isLoading ? 'Checking' : 'Unavailable' } as const)[st]} />
+        {gl?.connected && gl.expiresAt && <Typography variant="caption" color="text.secondary">Current access token expires {fmtWhen(gl.expiresAt)}; renewed automatically</Typography>}</Box>
+      <Chip color={st === 'connected' ? 'success' : 'default'} label={({ connected: 'Connected', disconnected: 'Not connected', unknown: status.isLoading ? 'Checking' : 'Unavailable' } as const)[st]} />
     </Stack>
     {status.isError && <Alert severity="warning" action={<Button color="inherit" size="small" onClick={() => status.refetch()}>Retry</Button>}>Couldn't load Gmail connection status.</Alert>}
     <Stack direction="row" gap={1.5} flexWrap="wrap">
