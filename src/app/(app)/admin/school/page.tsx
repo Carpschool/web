@@ -257,15 +257,13 @@ function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Pro
       <Chip color={chip.color} label={chip.label} />
     </Stack>
     <Stack gap={2}>
-      <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
-        <TextField select label="Method" value={pv} onChange={set('provider')} sx={{ width: { sm: 260 }, flexShrink: 0 }} helperText=" ">
-          {PROVIDERS.map(([v, l]) => <MenuItem key={v} value={v}>{l}</MenuItem>)}
-          {m.provider === 'gmail' && <MenuItem value="gmail">Gmail OAuth (legacy)</MenuItem>}
-          {m.provider === 'appsscript' && <MenuItem value="appsscript">Apps Script relay (interim)</MenuItem>}
-          {m.provider === 'test' && <MenuItem value="test">Test mode</MenuItem>}
+      <TextField select label="Method" value={pv} onChange={set('provider')}>
+        {PROVIDERS.map(([v, l]) => <MenuItem key={v} value={v}>{l}</MenuItem>)}
+        {m.provider === 'gmail' && <MenuItem value="gmail">Gmail OAuth (legacy)</MenuItem>}
+        {m.provider === 'appsscript' && <MenuItem value="appsscript">Apps Script relay (interim)</MenuItem>}
+        {m.provider === 'test' && <MenuItem value="test">Test mode</MenuItem>}
         </TextField>
-        <TextField label="From name" value={f.fromName} onChange={set('fromName')} helperText="e.g. KJT Rides" />
-      </Stack>
+      <TextField label="From name" value={f.fromName} onChange={set('fromName')} helperText="Shown as the sender, e.g. KJT Rides" />
       {pv === 'smtp' && <>
         <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
           <TextField label="Host" value={f.smtpHost} onChange={set('smtpHost')} sx={{ flex: 2 }} placeholder="smtp.example.com" slotProps={{ inputLabel: { shrink: true } }} />
