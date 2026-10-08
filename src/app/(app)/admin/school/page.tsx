@@ -244,7 +244,7 @@ function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Pro
   const set = (k: keyof ReturnType<typeof init>) => (e: React.ChangeEvent<HTMLInputElement>) => setF(x => ({ ...x, [k]: e.target.value }));
   const email = (v: string) => !v || /^\S+@\S+\.\S+$/.test(v);
   const pv = f.provider;
-  const errs = { smtpFrom: pv === 'smtp' && !email(f.smtpFrom), smtpPort: pv === 'smtp' && !(/^\d+$/.test(f.smtpPort) && +f.smtpPort >= 1 && +f.smtpPort <= 65535), gmailUser: pv === 'appsscript_push' && !email(f.gmailUser), url: pv === 'appsscript' && !!f.url.trim() && !APPS_SCRIPT_URL.test(f.url.trim()) };
+  const errs = { smtpFrom: pv === 'smtp' && !email(f.smtpFrom), smtpPort: pv === 'smtp' && !(/^\d+$/.test(f.smtpPort) && +f.smtpPort >= 1 && +f.smtpPort <= 65535), gmailUser: pv === 'appsscript_push' && !(f.gmailUser.trim() && email(f.gmailUser.trim())), url: pv === 'appsscript' && !!f.url.trim() && !APPS_SCRIPT_URL.test(f.url.trim()) };
   const invalid = Object.values(errs).some(Boolean);
   const dirty = JSON.stringify(f) !== JSON.stringify(init());
   const w = (b: any, k: string, v: string, clear: boolean) => { if (v) b[k] = v; else if (clear) b[k] = null; };
@@ -291,7 +291,7 @@ function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Pro
       </>}
       {pv === 'appsscript_push' && <>
         <Typography variant="body2" color="text.secondary">A script in the sending Google account pushes short-lived encrypted send tokens to this server. No Google passwords or OAuth secrets are stored here.</Typography>
-        <TextField label="Sending account" type="email" value={f.gmailUser} onChange={set('gmailUser')} error={errs.gmailUser} placeholder="name@school.ca" slotProps={{ inputLabel: { shrink: true }, htmlInput: { spellCheck: false, autoComplete: 'off' } }} helperText={errs.gmailUser ? 'Enter a valid email' : 'The Google account the script runs as; codes are sent from this address'} />
+        <TextField label="Sending account" type="email" value={f.gmailUser} onChange={set('gmailUser')} error={errs.gmailUser} placeholder="name@school.ca" slotProps={{ inputLabel: { shrink: true }, htmlInput: { spellCheck: false, autoComplete: 'off' } }} required helperText={errs.gmailUser ? 'Enter the sending account email' : 'The Google account the script runs as; codes are sent from this address'} />
         <PushPanel api={api} scope={s.officialName} />
       </>}
     </Stack>
