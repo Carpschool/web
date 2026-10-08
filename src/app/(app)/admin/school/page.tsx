@@ -226,7 +226,7 @@ function GooglePanel({ api, scope, done }: { api: (p: string, o?: any) => Promis
     <Dialog open={confirm} onClose={() => setConfirm(false)}>
 
       <DialogTitle>Disconnect Gmail?</DialogTitle>
-      <DialogContent><Typography variant="body2">Verification codes stop sending until another method is set up or Gmail is reconnected.</Typography></DialogContent>
+      <DialogContent><Typography variant="body2">Disconnecting revokes this Google account’s OAuth grants for all clients in the CarpSchool Google project. Other CarpSchool Google connections may need reconnection. Verification emails stop until another method is configured.</Typography></DialogContent>
       <DialogActions><Button onClick={() => setConfirm(false)}>Cancel</Button><Button color="error" variant="contained" onClick={disconnect}>Disconnect</Button></DialogActions>
     </Dialog>
   </Stack>;
