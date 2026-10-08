@@ -203,7 +203,7 @@ function GooglePanel({ api, scope, done }: { api: (p: string, o?: any) => Promis
   const gl = status.data;
   async function connect() {
     setBusy(true);
-    try { const r = await api('/admin/mailer/google/connect', { method: 'POST', body: { returnPath: '/admin/school?tab=mailer' } }); if (typeof r?.url !== 'string' || !/^https:\/\//.test(r.url)) throw new Error('Bad connect URL'); window.location.assign(r.url); }
+    try { const r = await api('/admin/mailer/google/connect', { method: 'POST' }); if (typeof r?.url !== 'string' || !/^https:\/\//.test(r.url)) throw new Error('Bad connect URL'); window.location.assign(r.url); }
     catch (e) { toast(errText(e), 'error'); setBusy(false); }
   }
   async function disconnect() {
