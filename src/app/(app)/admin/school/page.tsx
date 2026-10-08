@@ -43,6 +43,7 @@ export default function SchoolAdmin() {
   const choose = (code: string) => { localStorage.setItem(PICK, code); setPick(code); setTab(t => t); };
   const api = (path: string, o?: any) => apiFor(school!, path, o);
   const q = <T,>(path: string | null) => useQuery<T>({ queryKey: ['admin', school?.schoolCode, path], queryFn: () => apiFor<T>(school!, path!), enabled: !!school && !!path }); // eslint-disable-line react-hooks/rules-of-hooks
+  useEffect(() => { const u = new URL(window.location.href); const r = u.searchParams.get('mailer'); if (u.searchParams.get('tab') === 'mailer' || r) setTab(3); if (r) { toast(r === 'connected' ? 'Gmail connected' : 'Gmail connection failed', r === 'connected' ? undefined : 'error'); u.searchParams.delete('mailer'); window.history.replaceState(null, '', u.pathname + u.search); } }, []); // eslint-disable-line
   const users = q<any[]>('/admin/users'); const reports = q<any[]>(tab === 1 ? '/admin/reports' : null); const settings = q<Settings>(tab >= 2 ? '/admin/settings' : null);
   const [open, setOpen] = useState<string | null>(null);
   if (flags && !mine.length) return <><PageHead title="School admin" /><Alert severity="warning">You're not a school admin.</Alert></>;
@@ -85,7 +86,7 @@ function StudentDialog({ id, load, onClose }: { id: string; load: (id: string) =
     </Stack>}</DialogContent>
     <DialogActions><Button onClick={onClose}>Close</Button></DialogActions></Dialog>;
 }
-type Settings = { officialName: string; campus: { name: string; address: string; latitude: number; longitude: number }; emailRules: Rule[]; limits: { maxCarpoolStudents: number; maxHomesPerUser: number; maxUsersPerEduEmail: number }; mailer: { provider: string; url?: string; secretSet?: boolean; smtpHost?: string; smtpPort?: number; smtpSecurity?: string; smtpUser?: string; smtpFrom?: string; smtpPasswordSet?: boolean; push?: { keyCreatedAt: string | null; lastTokenAt: string | null; lastTokenStatus: 'never' | 'ok' | 'expired' | 'rejected'; tokenExpiresAt: string | null; lastError?: string } | null; gmailUser?: string; fromName: string; clientId?: string; clientSecretSet: boolean; refreshTokenSet: boolean; configured: boolean } };
+type Settings = { officialName: string; campus: { name: string; address: string; latitude: number; longitude: number }; emailRules: Rule[]; limits: { maxCarpoolStudents: number; maxHomesPerUser: number; maxUsersPerEduEmail: number }; mailer: { provider: string; url?: string; secretSet?: boolean; smtpHost?: string; smtpPort?: number; smtpSecurity?: string; smtpUser?: string; smtpFrom?: string; smtpPasswordSet?: boolean; google?: { email: string | null; status: 'connected' | 'disconnected' | 'error'; connectedAt?: string | null; lastRefreshAt?: string | null; error?: string } | null; push?: { keyCreatedAt: string | null; lastTokenAt: string | null; lastTokenStatus: 'never' | 'ok' | 'expired' | 'rejected'; tokenExpiresAt: string | null; lastError?: string } | null; gmailUser?: string; fromName: string; clientId?: string; clientSecretSet: boolean; refreshTokenSet: boolean; configured: boolean } };
 const DOMAIN = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 function Section({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return <Box><Typography variant="subtitle1" fontWeight={700} component="h2">{title}</Typography>{sub && <Typography variant="body2" color="text.secondary">{sub}</Typography>}<Stack gap={2} sx={{ mt: 1.5 }}>{children}</Stack></Box>;
@@ -190,8 +191,40 @@ function PushPanel({ m, api, done }: { m: Settings['mailer']; api: (p: string, o
     </Dialog>
   </Stack>;
 }
+function GooglePanel({ m, api, done }: { m: Settings['mailer']; api: (p: string, o?: any) => Promise<any>; done: () => any }) {
+  const toast = useToast(); const [busy, setBusy] = useState(false); const [confirm, setConfirm] = useState(false); const gl = m.google;
+  async function connect() {
+    setBusy(true);
+    try { const r = await api('/admin/mailer/google/connect', { method: 'POST', body: { returnPath: '/admin/school?tab=mailer' } }); if (typeof r?.url !== 'string' || !/^https:\/\//.test(r.url)) throw new Error('Bad connect URL'); window.location.assign(r.url); }
+    catch (e) { toast(errText(e), 'error'); setBusy(false); }
+  }
+  async function disconnect() {
+    setBusy(true); setConfirm(false);
+    try { await api('/admin/mailer/google/disconnect', { method: 'POST', body: {} }); toast('Gmail disconnected'); await done(); } catch (e) { toast(errText(e), 'error'); } finally { setBusy(false); }
+  }
+  const st = gl?.status ?? 'disconnected';
+  return <Stack gap={2}>
+    <Typography variant="body2" color="text.secondary">Sign in with the sending Google account. CarpSchool's central server holds the Google credentials and hands this school short-lived send access.</Typography>
+    <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} alignItems={{ sm: 'center' }}>
+      <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Connected account</Typography><Typography variant="body1">{gl?.email || 'None'}</Typography>
+        {gl?.lastRefreshAt && <Typography variant="caption" color="text.secondary">Last refreshed {fmtWhen(gl.lastRefreshAt)}</Typography>}</Box>
+      <Chip color={st === 'connected' ? 'success' : st === 'error' ? 'error' : 'default'} label={({ connected: 'Connected', error: 'Needs reconnect', disconnected: 'Not connected' } as const)[st]} />
+    </Stack>
+    {gl?.error && <Alert severity="warning">{gl.error}</Alert>}
+    <Stack direction="row" gap={1.5} flexWrap="wrap">
+      <Button variant="outlined" disabled={busy} onClick={connect}>{busy ? 'Opening Google…' : st === 'disconnected' ? 'Connect Gmail' : 'Reconnect'}</Button>
+      {st !== 'disconnected' && <Button color="error" disabled={busy} onClick={() => setConfirm(true)}>Disconnect</Button>}
+    </Stack>
+    <Dialog open={confirm} onClose={() => setConfirm(false)}>
+      <DialogTitle>Disconnect Gmail?</DialogTitle>
+      <DialogContent><Typography variant="body2">Verification codes stop sending until another method is set up or Gmail is reconnected.</Typography></DialogContent>
+      <DialogActions><Button onClick={() => setConfirm(false)}>Cancel</Button><Button color="error" variant="contained" onClick={disconnect}>Disconnect</Button></DialogActions>
+    </Dialog>
+  </Stack>;
+}
+
 const APPS_SCRIPT_URL = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/;
-const PROVIDERS = [['smtp', 'SMTP'], ['gmail', 'Google OAuth'], ['appsscript_push', 'Google Apps Script']] as const;
+const PROVIDERS = [['smtp', 'SMTP'], ['google', 'Google (Gmail)'], ['appsscript_push', 'Google Apps Script']] as const;
 function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Promise<any>; done: () => any; api: (p: string, o?: any) => Promise<any> }) {
   const m = s.mailer;
   const init = () => ({ provider: m.provider, fromName: m.fromName || '',
@@ -224,6 +257,7 @@ function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Pro
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
         <TextField select label="Method" value={pv} onChange={set('provider')} sx={{ minWidth: 220 }} helperText=" ">
           {PROVIDERS.map(([v, l]) => <MenuItem key={v} value={v}>{l}</MenuItem>)}
+          {m.provider === 'gmail' && <MenuItem value="gmail">Gmail OAuth (legacy)</MenuItem>}
           {m.provider === 'appsscript' && <MenuItem value="appsscript">Apps Script relay (interim)</MenuItem>}
           {m.provider === 'test' && <MenuItem value="test">Test mode</MenuItem>}
         </TextField>
@@ -242,7 +276,9 @@ function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Pro
         </Stack>
         <SecretField label="Password" isSet={!!m.smtpPasswordSet} value={f.smtpPassword} onChange={v => setF(x => ({ ...x, smtpPassword: v }))} clear={f.clearSmtp} onClear={v => setF(x => ({ ...x, clearSmtp: v }))} />
       </>}
+      {pv === 'google' && <GooglePanel m={m} api={api} done={done} />}
       {pv === 'gmail' && <>
+        <Alert severity="info">Legacy setup. Switch to Google (Gmail) to connect through CarpSchool instead.</Alert>
         <TextField label="Gmail address" type="email" value={f.gmailUser} onChange={set('gmailUser')} error={errs.gmailUser} helperText={errs.gmailUser ? 'Enter a valid email' : ' '} />
         <TextField label="OAuth client ID" value={f.clientId} onChange={set('clientId')} />
         <SecretField label="OAuth client secret" isSet={m.clientSecretSet} value={f.clientSecret} onChange={v => setF(x => ({ ...x, clientSecret: v }))} clear={f.clearSecret} onClear={v => setF(x => ({ ...x, clearSecret: v }))} />
