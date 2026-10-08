@@ -86,7 +86,7 @@ function StudentDialog({ id, load, onClose }: { id: string; load: (id: string) =
     </Stack>}</DialogContent>
     <DialogActions><Button onClick={onClose}>Close</Button></DialogActions></Dialog>;
 }
-type Settings = { officialName: string; campus: { name: string; address: string; latitude: number; longitude: number }; emailRules: Rule[]; limits: { maxCarpoolStudents: number; maxHomesPerUser: number; maxUsersPerEduEmail: number }; mailer: { provider: string; url?: string; secretSet?: boolean; smtpHost?: string; smtpPort?: number; smtpSecurity?: string; smtpUser?: string; smtpFrom?: string; smtpPasswordSet?: boolean; google?: { email: string | null; status: 'connected' | 'disconnected' | 'error'; connectedAt?: string | null; lastRefreshAt?: string | null; error?: string } | null; push?: { keyCreatedAt: string | null; lastTokenAt: string | null; lastTokenStatus: 'never' | 'ok' | 'expired' | 'rejected'; tokenExpiresAt: string | null; lastError?: string } | null; gmailUser?: string; fromName: string; clientId?: string; clientSecretSet: boolean; refreshTokenSet: boolean; configured: boolean } };
+type Settings = { officialName: string; campus: { name: string; address: string; latitude: number; longitude: number }; emailRules: Rule[]; limits: { maxCarpoolStudents: number; maxHomesPerUser: number; maxUsersPerEduEmail: number }; mailer: { provider: string; url?: string; secretSet?: boolean; smtpHost?: string; smtpPort?: number; smtpSecurity?: string; smtpUser?: string; smtpFrom?: string; smtpPasswordSet?: boolean; google?: { email: string | null; status: 'connected' | 'disconnected' | 'error'; connectedAt?: string | null; lastRefreshAt?: string | null; error?: string } | null; push?: { keyCreatedAt: string | null; lastTokenAt: string | null; lastTokenStatus: 'never' | 'ok' | 'expired' | 'rejected'; tokenExpiresAt: string | null; lastError?: string } | null; gmailUser?: string; fromName: string; configured: boolean } };
 const DOMAIN = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 function Section({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return <Box><Typography variant="subtitle1" fontWeight={700} component="h2">{title}</Typography>{sub && <Typography variant="body2" color="text.secondary">{sub}</Typography>}<Stack gap={2} sx={{ mt: 1.5 }}>{children}</Stack></Box>;
@@ -229,21 +229,19 @@ function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Pro
   const m = s.mailer;
   const init = () => ({ provider: m.provider, fromName: m.fromName || '',
     smtpHost: m.smtpHost || '', smtpPort: m.smtpPort ? String(m.smtpPort) : '587', smtpSecurity: m.smtpSecurity || 'starttls', smtpUser: m.smtpUser || '', smtpFrom: m.smtpFrom || '', smtpPassword: '', clearSmtp: false,
-    gmailUser: m.gmailUser || '', clientId: m.clientId || '', clientSecret: '', refreshToken: '', clearSecret: false, clearToken: false,
     url: m.url || '', secret: '', clearRelaySecret: false });
   const [f, setF] = useState(init); useEffect(() => setF(init()), [s]); // eslint-disable-line
   const { busy, run } = useSaver(save, done);
   const set = (k: keyof ReturnType<typeof init>) => (e: React.ChangeEvent<HTMLInputElement>) => setF(x => ({ ...x, [k]: e.target.value }));
   const email = (v: string) => !v || /^\S+@\S+\.\S+$/.test(v);
   const pv = f.provider;
-  const errs = { gmailUser: pv === 'gmail' && !email(f.gmailUser), smtpFrom: pv === 'smtp' && !email(f.smtpFrom), smtpPort: pv === 'smtp' && !(/^\d+$/.test(f.smtpPort) && +f.smtpPort >= 1 && +f.smtpPort <= 65535), url: pv === 'appsscript' && !!f.url.trim() && !APPS_SCRIPT_URL.test(f.url.trim()) };
+  const errs = { smtpFrom: pv === 'smtp' && !email(f.smtpFrom), smtpPort: pv === 'smtp' && !(/^\d+$/.test(f.smtpPort) && +f.smtpPort >= 1 && +f.smtpPort <= 65535), url: pv === 'appsscript' && !!f.url.trim() && !APPS_SCRIPT_URL.test(f.url.trim()) };
   const invalid = Object.values(errs).some(Boolean);
   const dirty = JSON.stringify(f) !== JSON.stringify(init());
   const w = (b: any, k: string, v: string, clear: boolean) => { if (v) b[k] = v; else if (clear) b[k] = null; };
   function submit() {
     const b: any = { provider: pv, fromName: f.fromName.trim() };
     if (pv === 'smtp') { Object.assign(b, { smtpHost: f.smtpHost.trim(), smtpPort: +f.smtpPort, smtpSecurity: f.smtpSecurity, smtpUser: f.smtpUser.trim(), smtpFrom: f.smtpFrom.trim() }); w(b, 'smtpPassword', f.smtpPassword, f.clearSmtp); }
-    if (pv === 'gmail') { if (f.gmailUser.trim()) b.gmailUser = f.gmailUser.trim(); if (f.clientId.trim()) b.clientId = f.clientId.trim(); w(b, 'clientSecret', f.clientSecret, f.clearSecret); w(b, 'refreshToken', f.refreshToken, f.clearToken); }
     if (pv === 'appsscript') { if (f.url.trim()) b.url = f.url.trim(); w(b, 'secret', f.secret, f.clearRelaySecret); }
     run({ mailer: b }, 'Mailer saved');
   }
@@ -277,13 +275,7 @@ function MailerForm({ s, save, done, api }: { s: Settings; save: (b: any) => Pro
         <SecretField label="Password" isSet={!!m.smtpPasswordSet} value={f.smtpPassword} onChange={v => setF(x => ({ ...x, smtpPassword: v }))} clear={f.clearSmtp} onClear={v => setF(x => ({ ...x, clearSmtp: v }))} />
       </>}
       {pv === 'google' && <GooglePanel m={m} api={api} done={done} />}
-      {pv === 'gmail' && <>
-        <Alert severity="info">Legacy setup. Switch to Google (Gmail) to connect through CarpSchool instead.</Alert>
-        <TextField label="Gmail address" type="email" value={f.gmailUser} onChange={set('gmailUser')} error={errs.gmailUser} helperText={errs.gmailUser ? 'Enter a valid email' : ' '} />
-        <TextField label="OAuth client ID" value={f.clientId} onChange={set('clientId')} />
-        <SecretField label="OAuth client secret" isSet={m.clientSecretSet} value={f.clientSecret} onChange={v => setF(x => ({ ...x, clientSecret: v }))} clear={f.clearSecret} onClear={v => setF(x => ({ ...x, clearSecret: v }))} />
-        <SecretField label="OAuth refresh token" isSet={m.refreshTokenSet} value={f.refreshToken} onChange={v => setF(x => ({ ...x, refreshToken: v }))} clear={f.clearToken} onClear={v => setF(x => ({ ...x, clearToken: v }))} />
-      </>}
+      {pv === 'gmail' && <Alert severity="info">Legacy Gmail setup{m.gmailUser ? ' (' + m.gmailUser + ')' : ''} is still active. Its credentials can't be edited here; switch to Google (Gmail) and connect to replace it.</Alert>}
       {pv === 'appsscript' && <>
         <Alert severity="info">Interim relay. Switch to Google Apps Script once its token is arriving.</Alert>
         <TextField label="Deployment URL" type="url" value={f.url} onChange={set('url')} error={errs.url} helperText={errs.url ? 'Must be https://script.google.com/macros/s/<deployment>/exec' : ' '} />
