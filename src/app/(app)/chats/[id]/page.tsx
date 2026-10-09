@@ -37,25 +37,26 @@ export default function Chat({ params }: { params: Promise<{ id: string }> }) {
   const homes = useApi<Home[]>(me?.role === 'rider' ? '/homes' : null); const drive = useApi<Drive>(me?.role === 'driver' && n.data ? '/drives/' + n.data.driveId : null);
   const [msgs, setMsgs] = useState<Message[]>([]); const [props, setProps] = useState<Proposal[]>([]); const [text, setText] = useState(''); const [live, setLive] = useState<'connecting' | 'live' | 'offline'>('connecting');
   const [dlg, setDlg] = useState<{ title: string; initial: { pos: [number, number]; time: string } | null } | null>(null); const [pin, setPin] = useState<string | null>(null); const [locked, setLocked] = useState<string | null>(null);
-  const sock = useRef<Socket | null>(null); const pending = useRef<((e: Error) => void) | null>(null); const end = useRef<HTMLDivElement>(null);
+  const tokenRef = useRef(token); tokenRef.current = token; const sock = useRef<Socket | null>(null); const pending = useRef<((e: Error) => void) | null>(null); const end = useRef<HTMLDivElement>(null);
   useEffect(() => { if (msgsQ.data) setMsgs(msgsQ.data); }, [msgsQ.data]);
   useEffect(() => { if (propsQ.data) setProps(propsQ.data); }, [propsQ.data]);
+  const baseUrl = school?.baseUrl; const ready = !!me?.sub;
   useEffect(() => {
-    if (!school) return; let s: Socket | null = null; let dead = false;
+    if (!baseUrl || !ready) return; let s: Socket | null = null; let dead = false; setLive('connecting');
     (async () => {
       try {
-        s = io(school.baseUrl, { auth: async cb => cb({ token: await token() }), transports: ['websocket', 'polling'] }); sock.current = s;
-        s.on('connect', () => s!.emit('negotiation:join', { negotiationId: id }, (a: any) => setLive(a?.ok === false ? 'offline' : 'live')));
+        s = io(baseUrl, { auth: async cb => { try { const t = await tokenRef.current(); if (!dead) cb({ token: t }); } catch { if (!dead) cb({}); } }, transports: ['websocket', 'polling'] }); sock.current = s;
+        s.on('connect', () => s!.emit('negotiation:join', { negotiationId: id }, (a: any) => !dead && setLive(a?.ok === false ? 'offline' : 'live')));
         s.on('disconnect', () => !dead && setLive('offline'));
-        s.on('connect_error', () => setLive('offline'));
+        s.on('connect_error', () => !dead && setLive('offline'));
         s.on('exception', (e: any) => { const err = new Error(typeof e?.message === 'string' ? e.message : 'Request rejected'); if (pending.current) { pending.current(err); pending.current = null; } else toast(err.message, 'error'); });
         s.on('message:new', (m: Message) => setMsgs(x => x.some(y => y._id === m._id) ? x : [...x, m]));
         s.on('proposal:new', (p: Proposal) => setProps(x => x.some(y => y._id === p._id) ? x : [p, ...x]));
         s.on('carpool:locked', (e: { driveId: string }) => { setLocked(e.driveId); n.refetch(); propsQ.refetch(); });
       } catch { setLive('offline'); }
     })();
-    return () => { dead = true; s?.disconnect(); };
-  }, [school, id]); // eslint-disable-line
+    return () => { dead = true; s?.disconnect(); if (sock.current === s) sock.current = null; };
+  }, [baseUrl, ready, id]); // eslint-disable-line
   const emit = (ev: string, data: any) => new Promise<any>((res, rej) => {
     if (!sock.current?.connected) return rej(new Error('Not connected. Trying again shortly.'));
     pending.current = (e) => rej(e);
