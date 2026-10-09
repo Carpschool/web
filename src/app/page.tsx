@@ -22,7 +22,7 @@ export default function Landing() {
   const { isSignedIn } = useAuth();
   return (
     <Box sx={{ minHeight: '100dvh', overflow: 'hidden', position: 'relative' }}>
-      <Box aria-hidden sx={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(19,32,59,.09) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to bottom, black, transparent 70%)' }} />
+      <Box aria-hidden sx={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(ellipse at 80% 15%, rgba(23,100,192,.08), transparent 55%)' }} />
       <Container maxWidth="lg" sx={{ position: 'relative' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 2.5 }}>
           <Wordmark />
@@ -30,9 +30,9 @@ export default function Landing() {
         </Stack>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.15fr 1fr' }, gap: { xs: 5, md: 8 }, alignItems: 'center', pt: { xs: 5, md: 10 }, pb: 8 }}>
           <Box className="rise">
-            <Typography variant="overline" color="text.secondary">Federated campus carpool</Typography>
-            <Typography variant="h1" sx={{ fontSize: { xs: '3.2rem', sm: '4.4rem', md: '5.6rem' }, mt: 1 }}>
-              Get a ride with people from <Box component="span" sx={{ whiteSpace: 'nowrap', backgroundImage: 'linear-gradient(transparent 62%, #F2A900 62%, #F2A900 92%, transparent 92%)' }}>your school</Box>.
+            <Typography variant="overline" color="text.secondary">Your school. Your way there.</Typography>
+            <Typography variant="h1" sx={{ fontSize: { xs: '2.8rem', sm: '3.8rem', md: '4.6rem' }, mt: 1 }}>
+              Get a ride with people from <Box component="span" sx={{ whiteSpace: 'nowrap', color: 'primary.main' }}>your school</Box>.
             </Typography>
             <Typography sx={{ mt: 3, fontSize: '1.15rem', color: 'text.secondary', maxWidth: 480 }}>Riders post when they need to get to class. Drivers already heading that way pick them up. Everyone is a verified student.</Typography>
             <Stack direction="row" gap={1.5} sx={{ mt: 4 }} flexWrap="wrap">
@@ -41,23 +41,23 @@ export default function Landing() {
             </Stack>
           </Box>
           <Box className="rise" sx={{ animationDelay: '120ms' }}>
-            <Box sx={{ bgcolor: 'primary.main', color: '#F5F0E6', borderRadius: '28px', p: 3, transform: { md: 'rotate(2deg)' }, boxShadow: '0 30px 60px -20px rgba(19,32,59,.45)' }}>
-              <Stack direction="row" justifyContent="space-between"><Typography sx={{ fontFamily: mono, fontSize: 12, opacity: 0.7, letterSpacing: '.14em' }}>BOARDING PASS</Typography><Typography sx={{ fontFamily: mono, fontSize: 12, opacity: 0.7 }}>MON 07:45</Typography></Stack>
+            <Box sx={{ bgcolor: 'background.paper', color: 'text.primary', border: '1px solid', borderColor: 'divider', borderRadius: '32px', p: { xs: 2.5, sm: 4 }, boxShadow: '0 24px 64px -20px rgba(23,36,58,.18)' }}>
+              <Stack direction="row" justifyContent="space-between"><Typography sx={{ fontFamily: mono, fontSize: 12, color: 'text.secondary', letterSpacing: '.14em' }}>YOUR MORNING COMMUTE</Typography><Typography sx={{ fontFamily: mono, fontSize: 12, color: 'text.secondary' }}>MON 07:45</Typography></Stack>
               <Stack direction="row" alignItems="center" gap={2} sx={{ my: 3 }}>
-                <Box><Typography sx={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 40, lineHeight: 1 }}>HOME</Typography><Typography sx={{ opacity: 0.6, fontSize: 13 }}>Chartwell Dr</Typography></Box>
-                <Box sx={{ flex: 1, borderTop: '2px dashed rgba(245,240,230,.4)', position: 'relative' }}><Box sx={{ position: 'absolute', left: '50%', top: -13, transform: 'translateX(-50%)', bgcolor: 'secondary.main', color: 'primary.main', borderRadius: 99, px: 1, fontSize: 12, fontWeight: 700 }}>12 min</Box></Box>
-                <Box textAlign="right"><Typography sx={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 40, lineHeight: 1 }}>SCH</Typography><Typography sx={{ opacity: 0.6, fontSize: 13 }}>Main entrance</Typography></Box>
+                <Box><Typography sx={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 32, lineHeight: 1 }}>HOME</Typography><Typography sx={{ color: 'text.secondary', fontSize: 13 }}>Chartwell Dr</Typography></Box>
+                <Box sx={{ flex: 1, borderTop: '1px solid rgba(23,36,58,.18)', position: 'relative' }}><Box sx={{ position: 'absolute', left: '50%', top: -13, transform: 'translateX(-50%)', bgcolor: 'primary.main', color: 'primary.main', borderRadius: 99, px: 1, fontSize: 12, fontWeight: 700 }}>12 min</Box></Box>
+                <Box textAlign="right"><Typography sx={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 32, lineHeight: 1 }}>SCH</Typography><Typography sx={{ color: 'text.secondary', fontSize: 13 }}>Main entrance</Typography></Box>
               </Stack>
-              <Box sx={{ borderTop: '2px dashed rgba(245,240,230,.25)', pt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'end' }}>
-                <Box><Typography sx={{ opacity: 0.6, fontSize: 12 }}>Driver</Typography><Typography fontWeight={700} noWrap>Grey Civic · 3 seats</Typography></Box>
-                <Box textAlign="right"><Typography sx={{ opacity: 0.6, fontSize: 12 }}>PIN</Typography><Typography sx={{ fontFamily: mono, fontWeight: 700, fontSize: 28, letterSpacing: '.18em', whiteSpace: 'nowrap', color: 'secondary.main' }}>4816</Typography></Box>
+              <Box sx={{ borderTop: '1px solid rgba(23,36,58,.1)', pt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'end' }}>
+                <Box><Typography sx={{ color: 'text.secondary', fontSize: 12 }}>Driver</Typography><Typography fontWeight={700} noWrap>Grey Civic · 3 seats</Typography></Box>
+                <Box textAlign="right"><Typography sx={{ color: 'text.secondary', fontSize: 12 }}>PIN</Typography><Typography sx={{ fontFamily: mono, fontWeight: 700, fontSize: 28, letterSpacing: '.18em', whiteSpace: 'nowrap', color: 'primary.main' }}>4816</Typography></Box>
               </Box>
             </Box>
           </Box>
         </Box>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2, pb: 10 }}>
-          {steps.map((s, i) => (<Box key={s.t} className="rise" sx={{ animationDelay: 200 + i * 80 + 'ms', p: 3, borderRadius: '22px', bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
-            <Box sx={{ color: 'primary.main', mb: 1.5 }}>{s.icon}</Box><Typography variant="h6">{s.t}</Typography><Typography color="text.secondary" sx={{ mt: 0.5 }}>{s.b}</Typography></Box>))}
+          {steps.map((s, i) => (<Box key={s.t} className="rise" sx={{ animationDelay: 200 + i * 80 + 'ms', p: 3, borderRadius: '24px', bgcolor: 'rgba(255,255,255,.75)', border: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ color: 'primary.main', mb: 2, bgcolor: 'secondary.main', borderRadius: '14px', width: 44, height: 44, display: 'grid', placeItems: 'center' }}>{s.icon}</Box><Typography variant="h6">{s.t}</Typography><Typography color="text.secondary" sx={{ mt: 0.5 }}>{s.b}</Typography></Box>))}
         </Box>
         <LegalFooter />
       </Container>
