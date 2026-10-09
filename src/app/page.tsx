@@ -21,7 +21,8 @@ const steps = [
 export default function Landing() {
   const { isSignedIn } = useAuth();
   return (
-    <Box sx={{ minHeight: '100dvh', overflow: 'hidden', position: 'relative' }}>
+    <Box component="main" id="main-content" tabIndex={-1} sx={{ minHeight: '100dvh', overflow: 'hidden', position: 'relative' }}>
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <Box aria-hidden sx={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(ellipse at 80% 15%, rgba(23,100,192,.08), transparent 55%)' }} />
       <Container maxWidth="lg" sx={{ position: 'relative' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ py: 2.5 }}>
@@ -45,7 +46,7 @@ export default function Landing() {
               <Stack direction="row" justifyContent="space-between"><Typography sx={{ fontFamily: mono, fontSize: 12, color: 'text.secondary', letterSpacing: '.14em' }}>YOUR MORNING COMMUTE</Typography><Typography sx={{ fontFamily: mono, fontSize: 12, color: 'text.secondary' }}>MON 07:45</Typography></Stack>
               <Stack direction="row" alignItems="center" gap={2} sx={{ my: 3 }}>
                 <Box><Typography sx={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 32, lineHeight: 1 }}>HOME</Typography><Typography sx={{ color: 'text.secondary', fontSize: 13 }}>Chartwell Dr</Typography></Box>
-                <Box sx={{ flex: 1, borderTop: '1px solid rgba(23,36,58,.18)', position: 'relative' }}><Box sx={{ position: 'absolute', left: '50%', top: -13, transform: 'translateX(-50%)', bgcolor: 'secondary.main', color: 'text.primary', borderRadius: 99, px: 1, fontSize: 12, fontWeight: 700 }}>12 min</Box></Box>
+                <Box sx={{ flex: 1, borderTop: '1px solid rgba(23,36,58,.18)', position: 'relative' }}><Box sx={{ position: 'absolute', left: '50%', top: -13, transform: 'translateX(-50%)', bgcolor: 'secondary.main', color: 'text.primary', borderRadius: 99, px: 1, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>12 min</Box></Box>
                 <Box textAlign="right"><Typography sx={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 32, lineHeight: 1 }}>SCH</Typography><Typography sx={{ color: 'text.secondary', fontSize: 13 }}>Main entrance</Typography></Box>
               </Stack>
               <Box sx={{ borderTop: '1px solid rgba(23,36,58,.1)', pt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'end' }}>

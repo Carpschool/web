@@ -48,6 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const active = nav.find(n => path.startsWith(n.href))?.href ?? false;
   return (
     <Box sx={{ minHeight: '100dvh', display: 'flex' }}>
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <Box component="nav" aria-label="Main" sx={{ display: { xs: 'none', md: 'flex' }, flexDirection: 'column', width: 256, flexShrink: 0, bgcolor: 'rgba(234,239,247,.8)', backdropFilter: 'blur(24px)', borderRight: '1px solid', borderColor: 'divider', p: 2, position: 'sticky', top: 0, height: '100dvh' }}>
         <Box sx={{ px: 1, py: 1 }}><Link href="/home" style={{ color: 'inherit', textDecoration: 'none' }}><Wordmark /></Link></Box>
         {school && <Typography variant="body2" color="text.secondary" sx={{ px: 1.2, mt: 1 }}>{school.name}</Typography>}
@@ -62,7 +63,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ display: { md: 'none' }, px: 2, py: 1.5, position: 'sticky', top: 0, zIndex: 10, bgcolor: 'rgba(245,247,250,.86)', backdropFilter: 'blur(24px)', borderBottom: '1px solid', borderColor: 'divider' }}>
           <Link href="/home" style={{ color: 'inherit', textDecoration: 'none' }}><Wordmark /></Link><UserButton />
         </Stack>
-        <Container maxWidth="md" sx={{ pt: { xs: 3, md: 5 } }}>
+        <Container component="main" id="main-content" tabIndex={-1} maxWidth="md" sx={{ pt: { xs: 3, md: 5 } }}>
           {schoolsError ? <Alert severity="error">{schoolsError}</Alert>
             : meState === 'error' ? <Alert severity="error" action={<Button color="inherit" onClick={() => refreshMe()}>Retry</Button>}>{meError}</Alert>
             : me?.banned ? <Alert severity="error">Your account has been suspended at this school. Contact your school admin.</Alert>
