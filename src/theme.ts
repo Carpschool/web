@@ -12,7 +12,7 @@ export const theme = createTheme({
     secondary: { main: amber, contrastText: ink },
     success: { main: moss }, error: { main: brick }, warning: { main: '#D9822B' },
     background: { default: paper, paper: '#FFFFFF' },
-    text: { primary: ink, secondary: alpha(ink, 0.74) },
+    text: { primary: ink, secondary: '#536174' },
     divider: alpha(ink, 0.12),
   },
   shape: { borderRadius: 14 },
