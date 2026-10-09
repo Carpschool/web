@@ -41,21 +41,23 @@ export default function Chat({ params }: { params: Promise<{ id: string }> }) {
   useEffect(() => { if (msgsQ.data) setMsgs(msgsQ.data); }, [msgsQ.data]);
   useEffect(() => { if (propsQ.data) setProps(propsQ.data); }, [propsQ.data]);
   const baseUrl = school?.baseUrl; const ready = !!me?.sub;
+  const dbg = (k: string, v?: unknown) => { if (typeof window !== 'undefined') { const w = window as any; (w.__chatDiag ||= []).push({ t: Date.now() % 1e6, k, v }); } };
+  dbg('render', { ready, baseUrl: !!baseUrl, meState: typeof me, hasSub: !!me?.sub });
   useEffect(() => {
-    if (!baseUrl || !ready) return; let s: Socket | null = null; let dead = false; setLive('connecting');
+    if (!baseUrl || !ready) return; let s: Socket | null = null; let dead = false; setLive('connecting'); dbg('effect-start');
     (async () => {
       try {
-        s = io(baseUrl, { auth: cb => { let done = false; const fin = (a: { token?: string }) => { if (!done && !dead) { done = true; cb(a); } }; const to = setTimeout(() => fin({}), 15000); Promise.resolve().then(() => tokenRef.current()).then(t => fin({ token: t }), () => fin({})).finally(() => clearTimeout(to)); }, transports: ['websocket', 'polling'] }); sock.current = s;
-        s.on('connect', () => s!.emit('negotiation:join', { negotiationId: id }, (a: any) => !dead && setLive(a?.ok === false ? 'offline' : 'live')));
+        s = io(baseUrl, { auth: cb => { let done = false; const fin = (a: { token?: string }) => { dbg('auth-cb', { hasToken: !!a.token }); if (!done && !dead) { done = true; cb(a); } }; const to = setTimeout(() => fin({}), 15000); Promise.resolve().then(() => tokenRef.current()).then(t => fin({ token: t }), () => fin({})).finally(() => clearTimeout(to)); }, transports: ['websocket', 'polling'] }); sock.current = s; dbg('io-created');
+        s.on('connect', () => dbg('connect')); s.on('connect', () => s!.emit('negotiation:join', { negotiationId: id }, (a: any) => !dead && setLive(a?.ok === false ? 'offline' : 'live')));
         s.on('disconnect', () => !dead && setLive('offline'));
-        s.on('connect_error', () => !dead && setLive('offline'));
+        s.on('connect_error', (e: Error) => { dbg('connect_error', e?.message); if (!dead) setLive('offline'); });
         s.on('exception', (e: any) => { const err = new Error(typeof e?.message === 'string' ? e.message : 'Request rejected'); if (pending.current) { pending.current(err); pending.current = null; } else toast(err.message, 'error'); });
         s.on('message:new', (m: Message) => setMsgs(x => x.some(y => y._id === m._id) ? x : [...x, m]));
         s.on('proposal:new', (p: Proposal) => setProps(x => x.some(y => y._id === p._id) ? x : [p, ...x]));
         s.on('carpool:locked', (e: { driveId: string }) => { setLocked(e.driveId); n.refetch(); propsQ.refetch(); });
       } catch { setLive('offline'); }
     })();
-    return () => { dead = true; s?.disconnect(); if (sock.current === s) sock.current = null; };
+    return () => { dbg('effect-cleanup'); dead = true; s?.disconnect(); if (sock.current === s) sock.current = null; };
   }, [baseUrl, ready, id]); // eslint-disable-line
   const emit = (ev: string, data: any) => new Promise<any>((res, rej) => {
     if (!sock.current?.connected) return rej(new Error('Not connected. Trying again shortly.'));
