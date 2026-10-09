@@ -45,7 +45,7 @@ export default function Chat({ params }: { params: Promise<{ id: string }> }) {
     if (!baseUrl || !ready) return; let s: Socket | null = null; let dead = false; setLive('connecting');
     (async () => {
       try {
-        s = io(baseUrl, { auth: async cb => { try { const t = await tokenRef.current(); if (!dead) cb({ token: t }); } catch { if (!dead) cb({}); } }, transports: ['websocket', 'polling'] }); sock.current = s;
+        s = io(baseUrl, { auth: cb => { let done = false; const fin = (a: { token?: string }) => { if (!done && !dead) { done = true; cb(a); } }; const to = setTimeout(() => fin({}), 15000); Promise.resolve().then(() => tokenRef.current()).then(t => fin({ token: t }), () => fin({})).finally(() => clearTimeout(to)); }, transports: ['websocket', 'polling'] }); sock.current = s;
         s.on('connect', () => s!.emit('negotiation:join', { negotiationId: id }, (a: any) => !dead && setLive(a?.ok === false ? 'offline' : 'live')));
         s.on('disconnect', () => !dead && setLive('offline'));
         s.on('connect_error', () => !dead && setLive('offline'));
