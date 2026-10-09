@@ -13,9 +13,13 @@ import { useToast } from '@/components/Toast';
 import type { Home } from '@/lib/types';
 import { errText } from '@/lib/format';
 export default function NewRequest() {
-  const homes = useApi<Home[]>('/homes'); const c = useCommute(homes.data, 'carpschool.draft.request'); const { api } = useSchool(); const router = useRouter(); const toast = useToast(); const qc = useQueryClient();
+  const homes = useApi<Home[]>('/homes'); const c = useCommute(homes.data, 'carpschool.draft.request'); const { api, me } = useSchool(); const router = useRouter(); const toast = useToast(); const qc = useQueryClient();
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
   async function submit() { setBusy(true); setErr(''); try { await api('/requests', { body: c.value }); c.clearDraft(); await qc.invalidateQueries(); toast("Request posted. We'll show drivers as they reach out."); router.push('/home'); } catch (e) { setErr(errText(e)); setBusy(false); } }
+  if (me && me.role !== 'rider') return (<>
+    <PageHead kicker="Rider" title="Request a ride" sub="Only rider accounts can post ride requests." />
+    <Alert severity="info" action={<Button color="inherit" onClick={() => router.push(me.role === 'driver' ? '/drives/new' : '/home')}>{me.role === 'driver' ? 'Post a drive' : 'Back home'}</Button>}>{me.role === 'driver' ? 'You are signed up as a driver. Post a drive instead.' : 'Finish setup to pick a role first.'}</Alert>
+  </>);
   return (<>
     <PageHead kicker="Rider" title="Request a ride" sub="Drivers heading your way will see this and reach out." />
     {homes.isLoading ? <Loading rows={3} h={64} /> : homes.error ? <ErrorState error={homes.error} retry={homes.refetch} /> : (
