@@ -48,18 +48,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const active = nav.find(n => path.startsWith(n.href))?.href ?? false;
   return (
     <Box sx={{ minHeight: '100dvh', display: 'flex' }}>
-      <Box component="nav" aria-label="Main" sx={{ display: { xs: 'none', md: 'flex' }, flexDirection: 'column', width: 248, flexShrink: 0, borderRight: '1px solid', borderColor: 'divider', p: 2, position: 'sticky', top: 0, height: '100dvh' }}>
+      <Box component="nav" aria-label="Main" sx={{ display: { xs: 'none', md: 'flex' }, flexDirection: 'column', width: 256, flexShrink: 0, bgcolor: 'rgba(234,239,247,.8)', backdropFilter: 'blur(24px)', borderRight: '1px solid', borderColor: 'divider', p: 2, position: 'sticky', top: 0, height: '100dvh' }}>
         <Box sx={{ px: 1, py: 1 }}><Link href="/home" style={{ color: 'inherit', textDecoration: 'none' }}><Wordmark /></Link></Box>
         {school && <Typography variant="body2" color="text.secondary" sx={{ px: 1.2, mt: 1 }}>{school.name}</Typography>}
         <List sx={{ mt: 2 }}>
-          {[...nav, ...extra].map(n => (<ListItemButton key={n.href} component={Link} href={n.href} selected={path.startsWith(n.href)} sx={{ borderRadius: 3, mb: 0.5, '&.Mui-selected': { bgcolor: 'primary.main', color: '#F5F0E6', '& svg': { color: 'secondary.main' }, '&:hover': { bgcolor: 'primary.main' } } }}>
+          {[...nav, ...extra].map(n => (<ListItemButton key={n.href} component={Link} href={n.href} selected={path.startsWith(n.href)} sx={{ borderRadius: 3, mb: 0.5, '&.Mui-selected': { bgcolor: 'rgba(23,100,192,.1)', color: 'primary.main', '& svg': { color: 'primary.main' }, '&:hover': { bgcolor: 'rgba(23,100,192,.15)' } } }}>
             <ListItemIcon sx={{ minWidth: 38 }}>{n.icon}</ListItemIcon><ListItemText primary={n.label} slotProps={{ primary: { fontWeight: 600 } }} /></ListItemButton>))}
         </List>
         <Box sx={{ flex: 1 }} />
         <Stack direction="row" alignItems="center" gap={1.5} sx={{ px: 1 }}><UserButton /><Box sx={{ minWidth: 0 }}><Typography fontWeight={650} noWrap>{me?.name}</Typography><Typography variant="body2" color="text.secondary" textTransform="capitalize">{me?.role}</Typography></Box></Stack>
       </Box>
       <Box sx={{ flex: 1, minWidth: 0, pb: { xs: 11, md: 4 } }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ display: { md: 'none' }, px: 2, py: 1.5, position: 'sticky', top: 0, zIndex: 10, bgcolor: 'rgba(245,240,230,.88)', backdropFilter: 'blur(10px)', borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ display: { md: 'none' }, px: 2, py: 1.5, position: 'sticky', top: 0, zIndex: 10, bgcolor: 'rgba(245,247,250,.86)', backdropFilter: 'blur(24px)', borderBottom: '1px solid', borderColor: 'divider' }}>
           <Link href="/home" style={{ color: 'inherit', textDecoration: 'none' }}><Wordmark /></Link><UserButton />
         </Stack>
         <Container maxWidth="md" sx={{ pt: { xs: 3, md: 5 } }}>
@@ -69,7 +69,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             : ready ? children : <Box sx={{ display: 'grid', placeItems: 'center', py: 12 }}><CircularProgress aria-label="Loading" /></Box>}
         </Container>
       </Box>
-      <Paper component="nav" aria-label="Main" elevation={0} sx={{ display: { md: 'none' }, position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 20, borderTop: '1px solid', borderColor: 'divider', pb: 'env(safe-area-inset-bottom)', bgcolor: 'rgba(255,252,246,.94)', backdropFilter: 'blur(12px)' }}>
+      <Paper component="nav" aria-label="Main" elevation={0} sx={{ display: { md: 'none' }, position: 'fixed', bottom: 0, left: 12, right: 12, borderRadius: '24px 24px 0 0', boxShadow: '0 -8px 32px rgba(23,36,58,.06)', zIndex: 20, borderTop: '1px solid', borderColor: 'divider', pb: 'env(safe-area-inset-bottom)', bgcolor: 'rgba(255,255,255,.88)', backdropFilter: 'blur(24px)' }}>
         <BottomNavigation showLabels value={active} sx={{ bgcolor: 'transparent', height: 64 }}>
           {nav.map(n => <BottomNavigationAction key={n.href} value={n.href} label={n.label} icon={n.icon} component={Link} href={n.href} />)}
         </BottomNavigation>
