@@ -22,3 +22,20 @@ body{background:#F5F0E6}
 .legal-foot a{color:#4A5468;text-decoration:none}
 .legal-foot a:hover{color:#13203B;text-decoration:underline}
 
+
+/* Platform typography and quiet, layered materials. */
+:root{--font-display:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--font-body:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--font-mono:ui-monospace,"SFMono-Regular",Consolas,monospace;color-scheme:light}
+body{background:#F5F7FA;font-optical-sizing:auto}
+::selection{background:#DCEAFF;color:#17243A}
+a,button,[role="button"]{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+a:focus-visible,button:focus-visible{outline:3px solid #1764C0;outline-offset:4px}
+.legal{color:#17243A}.legal-body a{text-decoration-color:#1764C0}.legal-body blockquote{border-left-color:#1764C0}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.rise{animation:rise .3s cubic-bezier(.2,.8,.2,1) both}
+@media(prefers-reduced-transparency:reduce){nav,.MuiDialog-paper{backdrop-filter:none!important;background:#F5F7FA!important}}
+@media(prefers-contrast:more){.MuiCard-root,.MuiOutlinedInput-root,nav{border:1px solid #536174!important}.MuiTypography-root{opacity:1!important}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+.skip-link{position:fixed;top:12px;left:12px;z-index:1500;padding:12px 20px;background:#fff;color:#17243A;border-radius:12px;transform:translateY(-200%)}
+.skip-link:focus-visible{transform:none}
+h1,h2,h3{scroll-margin-top:6rem;text-wrap:balance}
