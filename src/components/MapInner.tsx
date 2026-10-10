@@ -23,6 +23,15 @@ export default function MapInner(p: MapProps) {
   const ref = useRef<MapRef>(null); const [open, setOpen] = useState<number | null>(null); const [ready, setReady] = useState(false);
   const line = useMemo(() => p.line && p.line.length > 1 ? { type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: p.line.map(ll) } } : null, [JSON.stringify(p.line)]); // eslint-disable-line
   const circles = useMemo(() => ({ type: 'FeatureCollection' as const, features: (p.circles || []).map(c => ({ type: 'Feature' as const, properties: { color: c.color || '#F2A900' }, geometry: { type: 'Polygon' as const, coordinates: [circle(c.pos, c.radius)] } })) }), [JSON.stringify(p.circles)]); // eslint-disable-line
+  const box = useRef<HTMLDivElement>(null); const fitRef = useRef<() => void>(() => {});
+  fitRef.current = () => { const m = ref.current; const pts = [...(p.line || []), ...(p.markers || []).map(x => x.pos)]; if (!m || !p.fit || pts.length < 2) return; const lats = pts.map(x => x[0]), lngs = pts.map(x => x[1]); m.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 28, duration: 0, maxZoom: 16 }); };
+  // Refit only when the container's width actually changes (window/layout resize), never on map interaction.
+  useEffect(() => {
+    const el = box.current; if (!el || !ready || typeof ResizeObserver === 'undefined') return;
+    let w = el.clientWidth, t: ReturnType<typeof setTimeout>;
+    const ro = new ResizeObserver(() => { if (Math.abs(el.clientWidth - w) < 2) return; w = el.clientWidth; clearTimeout(t); t = setTimeout(() => { ref.current?.resize(); fitRef.current(); }, 120); });
+    ro.observe(el); return () => { ro.disconnect(); clearTimeout(t); };
+  }, [ready]);
   useEffect(() => {
     const m = ref.current; if (!m || !ready) return;
     const pts = [...(p.line || []), ...(p.markers || []).map(x => x.pos)];
@@ -30,7 +39,7 @@ export default function MapInner(p: MapProps) {
     else m.jumpTo({ center: ll(p.center), ...(p.zoom ? { zoom: p.zoom } : {}) });
   }, [ready, JSON.stringify(p.center), p.fit, (p.line || []).length, (p.markers || []).length]); // eslint-disable-line
   return (
-    <div role="region" aria-label={p.label || 'Map'} style={{ height: p.height ?? 280, borderRadius: 18, overflow: 'hidden' }}>
+    <div ref={box} role="region" aria-label={p.label || 'Map'} style={{ height: p.height ?? 280, borderRadius: 18, overflow: 'hidden' }}>
       <Map ref={ref} mapStyle={STYLE} initialViewState={{ longitude: p.center[1], latitude: p.center[0], zoom: p.zoom ?? 14 }} cooperativeGestures attributionControl={{ compact: true }}
         onLoad={() => setReady(true)} onClick={e => p.onPick?.(e.lngLat.lat, e.lngLat.lng)} style={{ width: '100%', height: '100%' }}>
         <NavigationControl position="top-right" showCompass={false} />
