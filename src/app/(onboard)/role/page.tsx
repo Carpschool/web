@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { takeNext } from '@/lib/next';
 import { useUser } from '@clerk/nextjs';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
@@ -36,7 +37,7 @@ export default function RolePage() {
   const { me, meState, api, refreshMe } = useSchool(); const { user } = useUser(); const router = useRouter();
   const [role, setRole] = useState<Role | null>(null); const [f, setF] = useState({ name: '', phone: '', personalEmail: '', make: '', color: '', plate: '' }); const [lic, setLic] = useState(false);
   const [confirm, setConfirm] = useState(false); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
-  useEffect(() => { if (meState === 'ready' && !me?.verified) router.replace('/verify'); else if (me?.role) router.replace('/home'); }, [me, meState, router]);
+  useEffect(() => { if (meState === 'ready' && !me?.verified) router.replace('/verify'); else if (me?.role) router.replace(takeNext()); }, [me, meState, router]);
   useEffect(() => { if (user && !f.name) setF(x => ({ ...x, name: user.fullName || '', personalEmail: user.primaryEmailAddress?.emailAddress || '' })); }, [user]); // eslint-disable-line
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF(x => ({ ...x, [k]: e.target.value }));
   const phoneOk = /^[+0-9 ()-]{7,20}$/.test(f.phone);

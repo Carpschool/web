@@ -1,6 +1,7 @@
 'use client';
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { takeNext } from '@/lib/next';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import Box from '@mui/material/Box';
@@ -27,7 +28,7 @@ function Homes() {
   const max = meta?.limits.homes ?? 3; const homes = q.data || [];
   return (<>
     <PageHead kicker={onboarding ? 'Last step' : 'Places'} title="Your homes" sub={`Where pickups and drop-offs happen. Save up to ${max}.`} action={homes.length > 0 && homes.length < max ? <Button variant="contained" startIcon={<Add />} onClick={() => { setEdit(null); setOpen(true); }}>Add</Button> : undefined} />
-    {onboarding && homes.length > 0 && <Alert severity="success" sx={{ mb: 2 }} action={<Button color="inherit" onClick={() => router.push('/home')}>Done</Button>}>You're all set. Add another home or start {me?.role === 'driver' ? 'posting drives' : 'requesting rides'}.</Alert>}
+    {onboarding && homes.length > 0 && <Alert severity="success" sx={{ mb: 2 }} action={<Button color="inherit" onClick={() => router.push(takeNext())}>Done</Button>}>You're all set. Add another home or start {me?.role === 'driver' ? 'posting drives' : 'requesting rides'}.</Alert>}
     {q.isLoading ? <Loading rows={2} h={200} /> : q.error ? <ErrorState error={q.error} retry={q.refetch} /> : homes.length === 0 ?
       <Empty icon={<HouseOutlined />} title="Add your first home" body="Drop a pin and choose how far you're happy to walk. Only people you carpool with see the exact pickup spot." action={<Button variant="contained" size="large" startIcon={<Add />} onClick={() => { setEdit(null); setOpen(true); }}>Add home</Button>} /> :
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
