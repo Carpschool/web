@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { takeNext } from '@/lib/next';
 import { useUser } from '@clerk/nextjs';
@@ -36,16 +36,16 @@ function RoleCard({ role, sel, onClick }: { role: Role; sel: boolean; onClick: (
 export default function RolePage() {
   const { me, meState, api, refreshMe } = useSchool(); const { user } = useUser(); const router = useRouter();
   const [role, setRole] = useState<Role | null>(null); const [f, setF] = useState({ name: '', phone: '', personalEmail: '', make: '', color: '', plate: '' }); const [lic, setLic] = useState(false);
-  const [confirm, setConfirm] = useState(false); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
-  useEffect(() => { if (meState === 'ready' && !me?.verified) router.replace('/verify'); else if (me?.role) router.replace(takeNext()); }, [me, meState, router]);
+  const submitted = useRef(false); const [confirm, setConfirm] = useState(false); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
+  useEffect(() => { if (meState === 'ready' && !me?.verified) router.replace('/verify'); else if (me?.role && !submitted.current) router.replace(takeNext()); }, [me, meState, router]);
   useEffect(() => { if (user && !f.name) setF(x => ({ ...x, name: user.fullName || '', personalEmail: user.primaryEmailAddress?.emailAddress || '' })); }, [user]); // eslint-disable-line
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF(x => ({ ...x, [k]: e.target.value }));
   const phoneOk = /^[+0-9 ()-]{7,20}$/.test(f.phone);
   const valid = role && f.name.trim().length > 1 && phoneOk && (role === 'rider' || (/^\S+@\S+\.\S+$/.test(f.personalEmail) && f.make && f.color && f.plate && lic));
   async function submit() {
-    setBusy(true); setErr('');
+    setBusy(true); setErr(''); submitted.current = true;
     const body = role === 'rider' ? { role, name: f.name.trim(), phone: f.phone.trim() } : { role, name: f.name.trim(), phone: f.phone.trim(), personalEmail: f.personalEmail.trim(), car: { make: f.make.trim(), color: f.color.trim(), plate: f.plate.trim().toUpperCase() }, licenseConfirmed: true };
-    try { await api('/profile', { body }); await refreshMe(); router.replace('/homes?onboarding=1'); } catch (e) { setErr(errText(e)); setConfirm(false); setBusy(false); }
+    try { await api('/profile', { body }); await refreshMe(); router.replace('/homes?onboarding=1'); } catch (e) { submitted.current = false; setErr(errText(e)); setConfirm(false); setBusy(false); }
   }
   if (!me) return <Onboard step={2} title="How will you use Carpschool?"><Loading rows={2} /></Onboard>;
   return (

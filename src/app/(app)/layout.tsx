@@ -1,7 +1,7 @@
 'use client';
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { saveNext } from '@/lib/next';
+import { saveNext, clearNext } from '@/lib/next';
 import Link from 'next/link';
 import { UserButton } from '@clerk/nextjs';
 import Box from '@mui/material/Box';
@@ -40,6 +40,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (schools && !school) { if (!picking) { saveNext(path); router.replace('/school'); } }
     else if (meState === 'ready' && !me?.verified) { saveNext(path); router.replace('/verify'); }
     else if (meState === 'ready' && !me?.role) { saveNext(path); router.replace('/role'); }
+    else if (meState === 'ready' && me?.verified && me.role && path !== '/homes') clearNext();
   }, [schools, school, picking, me, meState, router, isAdminPage, path]);
   const ready = (me?.verified && me.role) || path.startsWith('/admin/central');
   const extra = [
