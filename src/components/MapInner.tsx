@@ -24,7 +24,7 @@ export default function MapInner(p: MapProps) {
   const line = useMemo(() => p.line && p.line.length > 1 ? { type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: p.line.map(ll) } } : null, [JSON.stringify(p.line)]); // eslint-disable-line
   const circles = useMemo(() => ({ type: 'FeatureCollection' as const, features: (p.circles || []).map(c => ({ type: 'Feature' as const, properties: { color: c.color || '#F2A900' }, geometry: { type: 'Polygon' as const, coordinates: [circle(c.pos, c.radius)] } })) }), [JSON.stringify(p.circles)]); // eslint-disable-line
   const box = useRef<HTMLDivElement>(null); const fitRef = useRef<() => void>(() => {});
-  fitRef.current = () => { const m = ref.current; const pts = [...(p.line || []), ...(p.markers || []).map(x => x.pos)]; if (!m || !p.fit || pts.length < 2) return; const lats = pts.map(x => x[0]), lngs = pts.map(x => x[1]); m.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: { top: 32, bottom: 32, left: 56, right: 56 }, duration: 0, maxZoom: 16 }); };
+  fitRef.current = () => { const m = ref.current; const pts = [...(p.line || []), ...(p.markers || []).map(x => x.pos)]; if (!m || !p.fit || pts.length < 2) return; const lats = pts.map(x => x[0]), lngs = pts.map(x => x[1]); m.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: { top: 40, bottom: 44, left: 56, right: 56 }, duration: 0, maxZoom: 16 }); };
   // Refit only when the container's width actually changes (window/layout resize), never on map interaction.
   useEffect(() => {
     const el = box.current; if (!el || !ready || typeof ResizeObserver === 'undefined') return;

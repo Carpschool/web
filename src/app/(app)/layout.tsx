@@ -61,7 +61,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Box sx={{ flex: 1 }} />
         <Stack direction="row" alignItems="center" gap={1.5} sx={{ px: 1 }}><UserButton /><Box sx={{ minWidth: 0 }}><Typography fontWeight={650} noWrap>{me?.name}</Typography><Typography variant="body2" color="text.secondary" textTransform="capitalize">{me?.role}</Typography></Box></Stack>
       </Box>
-      <Box sx={{ flex: 1, minWidth: 0, pb: { xs: 11, md: 4 } }}>
+      <Box sx={{ flex: 1, minWidth: 0, pb: { xs: 'calc(var(--nav-h) + 24px)', md: 4 } }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ display: { md: 'none' }, px: 2, py: 1.5, position: 'sticky', top: 0, zIndex: 10, bgcolor: 'rgba(245,247,250,.86)', backdropFilter: 'blur(24px)', borderBottom: '1px solid', borderColor: 'divider' }}>
           <Link href="/home" style={{ color: 'inherit', textDecoration: 'none' }}><Wordmark /></Link><UserButton />
         </Stack>
