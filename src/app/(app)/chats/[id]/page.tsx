@@ -37,25 +37,31 @@ export default function Chat({ params }: { params: Promise<{ id: string }> }) {
   const homes = useApi<Home[]>(me?.role === 'rider' ? '/homes' : null); const drive = useApi<Drive>(me?.role === 'driver' && n.data ? '/drives/' + n.data.driveId : null);
   const [msgs, setMsgs] = useState<Message[]>([]); const [props, setProps] = useState<Proposal[]>([]); const [text, setText] = useState(''); const [live, setLive] = useState<'connecting' | 'live' | 'offline'>('connecting');
   const [dlg, setDlg] = useState<{ title: string; initial: { pos: [number, number]; time: string } | null } | null>(null); const [pin, setPin] = useState<string | null>(null); const [locked, setLocked] = useState<string | null>(null);
-  const sock = useRef<Socket | null>(null); const pending = useRef<((e: Error) => void) | null>(null); const end = useRef<HTMLDivElement>(null);
+  const tokenRef = useRef(token); tokenRef.current = token; const sock = useRef<Socket | null>(null); const pending = useRef<((e: Error) => void) | null>(null); const end = useRef<HTMLDivElement>(null);
   useEffect(() => { if (msgsQ.data) setMsgs(msgsQ.data); }, [msgsQ.data]);
   useEffect(() => { if (propsQ.data) setProps(propsQ.data); }, [propsQ.data]);
+  const baseUrl = school?.baseUrl; const ready = !!me?.sub;
+  const dbg = (k: string, v?: unknown) => { if (typeof window !== 'undefined') { const w = window as any; (w.__chatDiag ||= []).push({ t: Date.now() % 1e6, k, v }); } };
+  dbg('render', { ready, baseUrl: !!baseUrl, meState: typeof me, hasSub: !!me?.sub });
   useEffect(() => {
-    if (!school) return; let s: Socket | null = null; let dead = false;
+    if (!baseUrl || !ready) return; let s: Socket | null = null; let dead = false; setLive('connecting'); dbg('effect-start');
     (async () => {
       try {
-        s = io(school.baseUrl, { auth: async cb => cb({ token: await token() }), transports: ['websocket', 'polling'] }); sock.current = s;
-        s.on('connect', () => s!.emit('negotiation:join', { negotiationId: id }, (a: any) => setLive(a?.ok === false ? 'offline' : 'live')));
+        s = io(baseUrl, { auth: cb => { dbg('auth-fn'); let done = false; const fin = (a: { token?: string }) => { dbg('auth-cb', { hasToken: !!a.token }); if (!done && !dead) { done = true; cb(a); } }; const to = setTimeout(() => fin({}), 15000); Promise.resolve().then(() => tokenRef.current()).then(t => { dbg('token-ok'); fin({ token: t }); }, (e) => { dbg('token-err', e?.message); fin({}); }).finally(() => clearTimeout(to)); }, transports: ['polling', 'websocket'] }); sock.current = s; dbg('io-created', { autoConnect: (s.io as any)._autoConnect ?? null, readyState: s.io._readyState, path: s.io.opts.path, transports: s.io.opts.transports, uri: (s.io as any).uri, timeout: s.io.timeout(), pageOrigin: location.origin });
+        const eng = () => { const e: any = s!.io.engine; return e ? { rs: e.readyState, tr: e.transport?.name, uri: e.transport?.uri?.().replace(/[?&](token|sid)=[^&]*/g, '') } : null; };
+        [200, 1500, 5000, 12000].forEach(ms => setTimeout(() => { if (!dead) dbg('engine-state@' + ms, eng()); }, ms));
+        s.io.on('open', () => dbg('mgr-open', { transport: s!.io.engine?.transport?.name })); s.io.on('error', (e: Error) => dbg('mgr-error', e?.message)); s.io.on('reconnect_attempt', () => dbg('mgr-reconnect-attempt')); s.io.engine?.on('error', (e: any) => dbg('engine-error', e?.message || String(e))); dbg('engine-present', !!s.io.engine);
+        s.on('connect', () => dbg('connect')); s.on('connect', () => s!.emit('negotiation:join', { negotiationId: id }, (a: any) => !dead && setLive(a?.ok === false ? 'offline' : 'live')));
         s.on('disconnect', () => !dead && setLive('offline'));
-        s.on('connect_error', () => setLive('offline'));
+        s.on('connect_error', (e: Error) => { dbg('connect_error', { m: e?.message, type: (e as any)?.type, desc: String((e as any)?.description ?? '').slice(0, 120), eng: (s!.io.engine as any)?.readyState }); if (!dead) setLive('offline'); });
         s.on('exception', (e: any) => { const err = new Error(typeof e?.message === 'string' ? e.message : 'Request rejected'); if (pending.current) { pending.current(err); pending.current = null; } else toast(err.message, 'error'); });
         s.on('message:new', (m: Message) => setMsgs(x => x.some(y => y._id === m._id) ? x : [...x, m]));
         s.on('proposal:new', (p: Proposal) => setProps(x => x.some(y => y._id === p._id) ? x : [p, ...x]));
         s.on('carpool:locked', (e: { driveId: string }) => { setLocked(e.driveId); n.refetch(); propsQ.refetch(); });
       } catch { setLive('offline'); }
     })();
-    return () => { dead = true; s?.disconnect(); };
-  }, [school, id]); // eslint-disable-line
+    return () => { dbg('effect-cleanup'); dead = true; s?.disconnect(); if (sock.current === s) sock.current = null; };
+  }, [baseUrl, ready, id]); // eslint-disable-line
   const emit = (ev: string, data: any) => new Promise<any>((res, rej) => {
     if (!sock.current?.connected) return rej(new Error('Not connected. Trying again shortly.'));
     pending.current = (e) => rej(e);
